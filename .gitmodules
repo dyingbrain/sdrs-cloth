@@ -1,0 +1,6 @@
+[submodule "Python/pybind11"]
+	path = Python/pybind11
+	url = https://github.com/pybind/pybind11.git
+[submodule "extern/Exact-Root-Parity-CCD"]
+	path = extern/Exact-Root-Parity-CCD
+	url = https://github.com/Continuous-Collision-Detection/Exact-Root-Parity-CCD.git
