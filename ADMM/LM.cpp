@@ -1,15 +1,15 @@
-#include "Newton.h"
+#include "LM.h"
 #include <Utils/SparseUtils.h>
 #include <Utils/Timing.h>
 
 namespace PHYSICSMOTION {
 template <int N>
-void Newton<N>::optimize(const OptimizerParam& param) {
+void LM<N>::optimize(const OptimizerParam& param) {
   Optimizer<N>::init(param._tolG);
-  T alpha=1/param._initAlpha,E,E2;
-  SMatT H;
+  T alpha=param._initAlpha,E,E2;
+  SMatT H,HKKT;
   std::string collString;
-  Vec x=GradientDescend<N>::assembleX(),x2,G;
+  Vec x=LM<N>::assembleX(),x2,G,GKKT;
   int nrZUpdateFail=0,nCollCheck=0;
   //timing
   double collTime=0,cbTime=0;
@@ -21,7 +21,7 @@ void Newton<N>::optimize(const OptimizerParam& param) {
   //main loop
   for(int iter=1; iter<param._maxIter; iter++) {
     //evaluate gradient
-    E=GradientDescend<N>::evalGD(x,&G,&H);
+    E=LM<N>::evalGD(x,&G,&H);
     //collision remove
     nCollCheck++;
     if(Optimizer<N>::_coll && param._collisionRemoveI>0 && nCollCheck%param._collisionRemoveI==0) {
@@ -32,14 +32,14 @@ void Newton<N>::optimize(const OptimizerParam& param) {
         collString=Optimizer<N>::_coll->info(*this);
         //revert to last x
         Optimizer<N>::_x=x.segment(0,Optimizer<N>::_x.size());
-        x=GradientDescend<N>::assembleX();
+        x=LM<N>::assembleX();
         collTime+=TENDV();
         continue;
       }
       collTime+=TENDV();
     }
-    //solve Newton's direction
-    solve(x2,x,G,H,alpha);
+    //update solution using LM
+    solveSchur(x2,x,G,H,alpha);
     //collision check
     if(Optimizer<N>::_coll) {
       TBEG();
@@ -50,7 +50,7 @@ void Newton<N>::optimize(const OptimizerParam& param) {
         collString=Optimizer<N>::_coll->info(*this);
         //revert to last x
         Optimizer<N>::_x=x.segment(0,Optimizer<N>::_x.size());
-        x=GradientDescend<N>::assembleX();
+        x=LM<N>::assembleX();
         collTime+=TENDV();
         continue;
       }
@@ -62,7 +62,7 @@ void Newton<N>::optimize(const OptimizerParam& param) {
     if(alpha>1/param._tolAlpha)
       break;
     //update
-    E2=GradientDescend<N>::evalGD(x2,NULL,NULL);
+    E2=LM<N>::evalGD(x2,NULL,NULL);
     if(isfinite(E2) && E2<E) {
       x=x2;
       Optimizer<N>::_x=x.segment(0,Optimizer<N>::_x.size());
@@ -78,7 +78,7 @@ void Newton<N>::optimize(const OptimizerParam& param) {
       TBEG();
       while(!Optimizer<N>::_cb());
       cbTime+=TENDV();
-      GradientDescend<N>::project(G);
+      project(G);
       T gNorm=G.cwiseAbs().maxCoeff();
       std::cout << "Iter=" << iter
                 << " E=" << E
@@ -89,32 +89,27 @@ void Newton<N>::optimize(const OptimizerParam& param) {
                 << " TotalTime=" << TQUERYV() << " CollTime=" << collTime << " CBTime=" << cbTime << std::endl;
     }
     if(doDebugGradient)
-      GradientDescend<N>::debugGradient(x);
-    //updateZ
-    if(!GradientDescend<N>::updateZ(x,param._tolGYZ))
-      nrZUpdateFail++;
+      LM<N>::debugGradient(x);
   }
   //timing
   TENDV();
 }
 template <int N>
-void Newton<N>::solve(Vec& x2,const Vec& x,const Vec& G,const SMatT& H,T alpha){
-  _GKKT=concat<Vec>(G,Vec::Zero(Optimizer<N>::_Cons.rows()));
-  _HKKT=buildKKT<T,0,int>(H,Optimizer<N>::_Cons,alpha);
-  //Select solver based on PSD property of matrix
-  if(Optimizer<N>::_Cons.size()==0) {
-    std::cout << "BEG-LDLT-Solve size=" << _HKKT.rows() << std::endl;
-    _invHSym.compute(_HKKT);
-    x2=x-_invHSym.solve(_GKKT);
-    std::cout << "END-LDLT-Solve" << std::endl;
-  } else {
-    std::cout << "BEG-LU-Solve size=" << _HKKT.rows() << std::endl;
-    _invH.compute(_HKKT);
-    x2=x-_invH.solve(_GKKT).segment(0,x.size());
-    std::cout << "END-LU-Solve" << std::endl;
-  }
+typename LM<N>::Vec LM<N>::assembleX() {
+  Vec x;
+  return x;
+}
+template <int N>
+typename LM<N>::T LM<N>::evalGD(const Vec& x,Vec* G,SMatT* H) {
+  return 0;
+}
+template <int N>
+void LM<N>::solveSchur(Vec& x2,const Vec& x,const Vec& G,const Vec& H,T alpha) {
+}
+template <int N>
+void LM<N>::debugGradient(const Vec& x) {
 }
 //instance
-template class Newton<2>;
-template class Newton<3>;
+template class LM<2>;
+template class LM<3>;
 }

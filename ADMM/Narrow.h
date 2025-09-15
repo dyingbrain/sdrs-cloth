@@ -7,7 +7,7 @@
 #include <Environment/DistanceFunction.h>
 #include <Utils/Utils.h>
 //use CCD library
-//#define USE_CCD
+#define USE_CCD
 #define USE_SIMPLE_TRIANGLE_CCD
 //#define USE_EXACT_CCD
 #ifdef USE_EXACT_CCD

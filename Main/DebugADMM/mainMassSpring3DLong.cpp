@@ -102,7 +102,7 @@ int main(int argc,char** argv) {
   param._tolG=1e-2f;
   param._maxIter=1e6;
   //param._debugGradientI=50;
-  param._type=OptimizerParam::ADMM;
+  param._type=OptimizerParam::NEWTON;
   solver.setCB([&]() {
     for(int i=0; i<(int)m.vss().size(); i++)
       m.vssNonConst()[i]=solver.x().template segment<3>(i*3).template cast<MeshExact::T>();

@@ -10,6 +10,7 @@ struct OptimizerParam {
     ADMM,
     GD,
     NEWTON,
+    LM,
     UNKNOWN,
   };
   T _tolXY=0;

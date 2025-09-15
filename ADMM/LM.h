@@ -1,11 +1,11 @@
-#ifndef NEWTON_H
-#define NEWTON_H
+#ifndef LM_H
+#define LM_H
 
-#include "GradientDescend.h"
+#include "Newton.h"
 
 namespace PHYSICSMOTION {
 template <int N>
-class Newton : public GradientDescend<N> {
+class LM : public GradientDescend<N> {
  public:
   using typename Optimizer<N>::T;
   DECL_MAT_VEC_MAP_TYPES_T
@@ -16,12 +16,11 @@ class Newton : public GradientDescend<N> {
   using typename Optimizer<N>::SMatT;
   using typename Optimizer<N>::LinearConstraint;
   void optimize(const OptimizerParam& param) override;
- protected:
-  void solve(Vec& x2,const Vec& x,const Vec& G,const SMatT& H,T alpha);
-  Eigen::SimplicialLDLT<SMatT> _invHSym;
-  Eigen::SparseLU<SMatT> _invH;
-  SMatT _HKKT;
-  Vec _GKKT;
+protected:
+  Vec assembleX();
+  T evalGD(const Vec& x,Vec* G,SMatT* H = NULL);
+  void solveSchur(Vec& x2,const Vec& x,const Vec& G,const Vec& H,T alpha);
+  void debugGradient(const Vec& x);
 };
 }
 
