@@ -56,7 +56,8 @@ OptimizerTerm::VecCM OptimizerTerm::G0() const {
 }
 OptimizerTerm::T OptimizerTerm::evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) {
   //Direct evaluation is not implemented by default, it is more involved than evalG
-  FUNCTION_NOT_IMPLEMENTED
+  //FUNCTION_NOT_IMPLEMENTED
+  return 0;
 }
 bool OptimizerTerm::updateZ(T tolG) {
   return true;

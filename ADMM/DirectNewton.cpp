@@ -24,11 +24,12 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
     //find search direction
     Newton<N>::solve(d,x,G,H,param._psdEps);
     //line search
-    GradientDescend<N>::lineSearch(x2=x,E,d,alpha,param);
+    DirectNewton<N>::lineSearch(x2=x,E,d,alpha,param);
     //step-size too small
     if (alpha < param._tolAlpha)
         break;
     E2=DirectNewton<N>::evalGD(x2,NULL,NULL);
+    x=x2;
     //termination
     Optimizer<N>::project(G);
     if (isfinite(E) && G.cwiseAbs().maxCoeff() < param._tolG)
@@ -98,6 +99,21 @@ void DirectNewton<N>::debugGradient(const Vec& x) {
   T E2=DirectNewton<N>::evalGD(x+dx*DELTA,&G2,NULL,false);
   DEBUG_GRADIENT("G",G.dot(dx),G.dot(dx)-(E2-E)/DELTA)
   DEBUG_GRADIENT("H",(H*dx).norm(),(H*dx-(G2-G)/DELTA).norm())
+}
+template <int N>
+void DirectNewton<N>::lineSearch(Vec& x,T& E,const Vec& D,T& alpha,const OptimizerParam& param) {
+  Vec x2=x+D*alpha;
+  T E2=DirectNewton<N>::evalGD(x2,NULL);
+  while(E2>=E && alpha>param._tolAlpha) {
+    alpha*=param._decAlpha;
+    x2=x+D*alpha;
+    E2=DirectNewton<N>::evalGD(x2,NULL);
+  }
+  if(alpha<=param._tolAlpha)
+    return;
+  x=x2;
+  E=E2;
+  alpha*=param._incAlpha;
 }
 //instance
 template class DirectNewton<2>;

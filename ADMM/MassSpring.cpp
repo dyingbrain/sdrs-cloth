@@ -57,6 +57,31 @@ typename MassSpring<N>::T MassSpring<N>::evalG(bool calcG,bool initL,SMatT* H,in
   return g;
 }
 template <int N>
+typename MassSpring<N>::T MassSpring<N>::evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) {
+  T g=0;
+  if(calcG)
+    _G.resize(N,n());
+  if(H)
+    _HBlks.resize(n());
+  OMP_PARALLEL_FOR_
+  for(int i=0; i<n(); i++) {
+    T E;
+    MatNT HBlk;
+    VecNT y=_Ax.col(i),G;
+    energyYDirect(y,E,calcG?&G:NULL,H?&HBlk:NULL,i,projPSD);
+    parallelAdd(g,E);
+    if(calcG)
+      _G.col(i)=G;
+    if(H) {
+      _HBlks[i]._blk=HBlk;
+      _HBlks[i]._nY=N;
+    }
+  }
+  if(H)
+    assembleHessian(*H,y0Off);
+  return g;
+}
+template <int N>
 bool MassSpring<N>::updateY(T betaY,T beta,T tolG) {
   _evalgOnly=false;
   bool succ=true;
@@ -200,6 +225,42 @@ bool MassSpring<N>::energyY(const VecNT& y,T& E,VecNT* G,MatNT* H,int i) const {
       *H-=(D2/yLen)*(MatNT::Identity()-y*y.transpose()/(yLen*yLen));
       *H+=(DD2/(yLen*yLen))*y*y.transpose();
     }
+  }
+  return true;
+}
+template <int N>
+bool MassSpring<N>::energyYDirect(const VecNT& y, T& E, VecNT* G, MatNT* H, int i, bool projPSD) const {
+  //energy
+  T D=0,DD=0,D2=0,DD2=0,yLen=y.norm();
+  E=0;
+  E+=_k[i]*(yLen-_l[i])*(yLen-_l[i])/2;
+  if(_lL[i]>0)
+    E+=Penalty::eval<FLOAT>(yLen-_lL[i],G?&D:NULL,H?&DD:NULL,0,1);
+  if(_lH[i]>0)
+    E+=Penalty::eval<FLOAT>(_lH[i]-yLen,G?&D2:NULL,H?&DD2:NULL,0,1);
+  if(!isfinite(E))
+    return false;
+  //gradient
+  T GCoef=0;
+  if(G) {
+    GCoef+=_k[i]*(yLen-_l[i])/yLen;
+    if(_lL[i]>0)
+      GCoef+=D/yLen;
+    if(_lH[i]>0)
+      GCoef-=D2/yLen;
+    *G=GCoef*y;
+  }
+  //hessian
+  T HCoef=0;
+  if(H) {
+    HCoef+=_k[i];
+    if(_lL[i]>0)
+      HCoef+=DD;
+    if(_lH[i]>0)
+      HCoef+=DD2;
+    *H=HCoef/(yLen*yLen)*y*y.transpose();
+    if(!projPSD)
+      *H+=GCoef*(MatNT::Identity()-y*y.transpose()/(yLen*yLen));
   }
   return true;
 }

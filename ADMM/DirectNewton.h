@@ -19,6 +19,7 @@ class DirectNewton : public Newton<N> {
 protected:
   T evalGD(const Vec& x,Vec* G,SMatT* H=NULL,bool projPSD=true);
   void debugGradient(const Vec& x);
+  void lineSearch(Vec& x,T& E,const Vec& D,T& alpha,const OptimizerParam& param);
 };
 }
 

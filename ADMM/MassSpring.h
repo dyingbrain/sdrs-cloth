@@ -18,6 +18,7 @@ class MassSpring : public CLogx, public OptimizerTerm {
   int n() const override;
   std::shared_ptr<OptimizerTerm> copy() const override;
   T evalG(bool calcG,bool initL,SMatT* H,int y0Off) override;
+  T evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) override;
   bool updateY(T betaY,T beta,T tolG) override;
   bool updateZ(T tolG) override;
   void reset(int mask) override;
@@ -27,6 +28,7 @@ class MassSpring : public CLogx, public OptimizerTerm {
  private:
   //helper
   bool energyY(const VecNT& y,T& E,VecNT* G,MatNT* H,int i) const;
+  bool energyYDirect(const VecNT& y,T& E,VecNT* G,MatNT* H,int i,bool projPSD) const;
   //data
   MatNXT _z;
   std::vector<T> _alpha;
