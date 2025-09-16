@@ -28,6 +28,7 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
     //step-size too small
     if (alpha < param._tolAlpha)
         break;
+    Optimizer<N>::_x=x2.segment(0,Optimizer<N>::_x.size());
     E2=DirectNewton<N>::evalGD(x2,NULL,NULL);
     x=x2;
     //termination
