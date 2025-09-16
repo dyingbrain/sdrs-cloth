@@ -24,6 +24,7 @@ class ARAP : public CLogx, public OptimizerTerm {
   int n() const override;
   std::shared_ptr<OptimizerTerm> copy() const override;
   T evalG(bool calcG,bool initL,SMatT* H,int y0Off) override;
+  T evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) override;
   bool updateY(T betaY,T beta,T tolG) override;
   bool updateZ(T tolG) override;
   void reset(int mask) override;
@@ -33,6 +34,7 @@ class ARAP : public CLogx, public OptimizerTerm {
  private:
   //helper
   bool energyYD(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i) const;
+  bool energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,bool projPSD) const;
   bool energyZ(const VecVT& z,T& E,VecVT* G,MatVT* H,int tetId,int fid) const;
   VecVT center(int tetId) const;
   VecVT normal(int tetId,int fid) const;
@@ -44,6 +46,7 @@ class ARAP : public CLogx, public OptimizerTerm {
   //param
   std::vector<MatVT> _invF0;
   std::vector<T> _k;
+  int _newtonIter=1;
   bool _debug=false;
 };
 }

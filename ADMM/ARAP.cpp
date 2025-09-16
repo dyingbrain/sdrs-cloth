@@ -75,6 +75,43 @@ typename ARAP<N>::T ARAP<N>::evalG(bool calcG,bool initL,SMatT* H,int y0Off) {
   return g;
 }
 template <int N>
+typename ARAP<N>::T ARAP<N>::evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) {
+  T g=0;
+  if(calcG) {
+    _G.resize(N*(N+1),n());
+    _Gd0.resize(N,n());
+  }
+  if(H)
+    _HBlks.resize(n());
+  //We need to update Z to estimate gradient and Hessian using the inverse function theorem
+  int savedNewtonIter=_newtonIter;
+  _newtonIter=20;   //This is heuristic, but typically 20 is enough
+  updateZ(Epsilon<T>::finiteDifferenceEps());
+  _newtonIter=savedNewtonIter;
+  //Start estimation
+  OMP_PARALLEL_FOR_
+  for(int i=0; i<n(); i++) {
+    T E;
+    MatYDT HBlk;
+    VecYDT yd,G;
+    yd.template segment<N*(N+1)>(0)=_Ax.col(i);
+    yd.template segment<N>(N*(N+1))=_d0.col(i);
+    energyYDDirect(yd,E,calcG?&G:NULL,H?&HBlk:NULL,i,projPSD);
+    parallelAdd(g,E);
+    if(calcG) {
+      _G.col(i)=G.template segment<N*(N+1)>(0);
+      _Gd0.col(i)=G.template segment<N>(N*(N+1));
+    }
+    if(H) {
+      _HBlks[i]._blk=HBlk;
+      _HBlks[i]._nY=N*(N+1);
+    }
+  }
+  if(H)
+    assembleHessian(*H,y0Off);
+  return g;
+}
+template <int N>
 bool ARAP<N>::updateY(T betaY,T beta,T tolG) {
   _evalgOnly=false;
   bool succ=true;
@@ -137,7 +174,7 @@ bool ARAP<N>::updateZ(T tolG) {
       auto energyFunc=[&](const VecVT& x,T& E,VecVT* G,MatVT* H)->bool {
         return energyZ(x,E,G,H,i,d);
       };
-      if(!opt.optimizeOnSphere(_alphaZ[d][i],z=_z[d].col(i),E,G,H,energyFunc,tolG))
+      if(!opt.optimizeOnSphere(_alphaZ[d][i],z=_z[d].col(i),E,G,H,energyFunc,tolG,_newtonIter))
         succ=false;
 #else
       auto energyFunc=[&](const VecVT& x,T& E,VecVT* G,MatVT* H)->bool {
@@ -147,7 +184,7 @@ bool ARAP<N>::updateZ(T tolG) {
           return false;
         return true;
       };
-      if(!opt.optimize(_alphaZ[d][i],z=_z[d].col(i),E,G,H,energyFunc,tolG))
+      if(!opt.optimize(_alphaZ[d][i],z=_z[d].col(i),E,G,H,energyFunc,tolG,_newtonIter))
         succ=false;
 #endif
       _z[d].col(i)=z;
@@ -350,6 +387,77 @@ bool ARAP<N>::energyYD(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i) const {
         H->template block<N,N>(voff,N*(N+1))-=DD*n*n.transpose();
         H->template block<N,N>(N*(N+1),voff)-=DD*n*n.transpose();
         H->template block<N,N>(N*(N+1),N*(N+1))+=DD*n*n.transpose();
+      }
+    }
+  }
+  return true;
+}
+template <int N>
+bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,bool projPSD) const {
+  T D=0,DD=0;
+  E=0;
+  //ARAP
+  Eigen::Map<const MatVT> R(_R.col(i).data());
+  const auto& invF0=_invF0[i];
+  for(int r=0; r<N; r++)
+    for(int c=0; c<N; c++) {
+      //term is k/2*|F.row(r)*invF0.col(c)-R(r,c)|^2
+      int vid[4]= {0+r,N+r,N*2+r,N*3+r};
+      T coef[4] = {-invF0.col(c).sum(),invF0(0,c),invF0(1,c),2>=N?0:invF0(2,c)},d=-R(r,c);
+      for(int rr=0; rr<N+1; rr++)
+        d+=yd[vid[rr]]*coef[rr];
+      E+=d*d*_k[i]/2;
+      if(G)
+        for(int rr=0; rr<N+1; rr++)
+          G->coeffRef(vid[rr])+=d*coef[rr]*_k[i];
+      if(H)
+        for(int rr=0; rr<N+1; rr++)
+          for(int cc=0; cc<N+1; cc++)
+            H->coeffRef(vid[rr],vid[cc])+=coef[rr]*coef[cc]*_k[i];
+    }
+  //barrier
+  MatVT DDInv;
+  VecVT dir,dir2;
+  for(int fid=0; fid<N+1; fid++) {
+    const auto& n=_z[fid].col(i);
+    if(H && !projPSD) {
+      DDInv.setZero();
+      for(int d=1; d<=N; d++) {
+        int vid=(fid+d)%(N+1),voff=vid*N;
+        dir=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
+        Penalty::eval<FLOAT>(n.dot(dir),G?&D:NULL,H?&DD:NULL,0,1);
+        DDInv+=dir*dir.transpose()*DD;
+      }
+      for(int i=0;i<DDInv.rows();i++)
+		DDInv(i,i)+=std::max(DDInv(i,i),Epsilon<T>::finiteDifferenceEps());
+      DDInv=DDInv.inverse();
+    }
+    for(int d=1; d<=N; d++) {
+      int vid=(fid+d)%(N+1),voff=vid*N;
+      dir=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
+      E+=Penalty::eval<FLOAT>(n.dot(dir),G?&D:NULL,H?&DD:NULL,0,1);
+      if(!isfinite(E))
+        return false;
+      if(G) {
+        G->template segment<N>(voff)+=D*n;
+        G->template segment<N>(N*(N+1))-=D*n;
+      }
+      if(H) {
+        H->template block<N,N>(voff,voff)+=DD*n*n.transpose();
+        H->template block<N,N>(voff,N*(N+1))-=DD*n*n.transpose();
+        H->template block<N,N>(N*(N+1),voff)-=DD*n*n.transpose();
+        H->template block<N,N>(N*(N+1),N*(N+1))+=DD*n*n.transpose();
+      }
+      if (H && !projPSD) {
+        for(int d2=1; d2<=N; d2++) {
+          int vid2=(fid+d2)%(N+1),voff2=vid2*N;
+          dir2=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
+          DD=-dir.dot(DDInv*dir2);
+          H->template block<N,N>(voff,voff2)+=DD*n*n.transpose();
+          H->template block<N,N>(voff,N*(N+1))-=DD*n*n.transpose();
+          H->template block<N,N>(N*(N+1),voff2)-=DD*n*n.transpose();
+          H->template block<N,N>(N*(N+1),N*(N+1))+=DD*n*n.transpose();
+        }
       }
     }
   }
