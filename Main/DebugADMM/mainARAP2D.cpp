@@ -78,8 +78,9 @@ int main(int argc,char** argv) {
   param._initBeta=1e2f;
   param._tolG=1e-2f;
   param._maxIter=5e4;
+  param._printI=1;
   //param._debugGradientI=50;
-  param._type=OptimizerParam::ADMM;
+  param._type=OptimizerParam::DIRECT_NEWTON;
   solver.setCB([&]() {
     for(int i=0; i<(int)m.vss().size(); i++)
       m.vssNonConst()[i].template segment<2>(0)=solver.x().template segment<2>(i*2).template cast<MeshExact::T>();

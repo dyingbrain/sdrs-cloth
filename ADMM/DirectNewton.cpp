@@ -3,6 +3,7 @@
 #include <Utils/Timing.h>
 
 namespace PHYSICSMOTION {
+static const int SLOT_BEFORE_Z_UPDATE = 0;
 template <int N>
 void DirectNewton<N>::optimize(const OptimizerParam& param) {
   Optimizer<N>::init(param._tolG);
@@ -31,6 +32,7 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
     Optimizer<N>::_x=x2.segment(0,Optimizer<N>::_x.size());
     E2=DirectNewton<N>::evalGD(x2,NULL,NULL);
     x=x2;
+    Optimizer<N>::save(SLOT_BEFORE_Z_UPDATE,OptimizerTerm::MASK_Z);
     //termination
     Optimizer<N>::project(G);
     if (isfinite(E) && G.cwiseAbs().maxCoeff() < param._tolG)
@@ -74,6 +76,7 @@ typename DirectNewton<N>::T DirectNewton<N>::evalGD(const Vec& x,Vec* G,SMatT* H
     H->setFromTriplets(HTrips.begin(),HTrips.end());
   }
   //term by term: g
+  Optimizer<N>::load(SLOT_BEFORE_Z_UPDATE,OptimizerTerm::MASK_Z);
   for(const auto& g:Optimizer<N>::_gss) {
     g->y()=g->Ax()=g->A()*x.segment(0,g->A().cols());
     int nY0=g->y0().size();

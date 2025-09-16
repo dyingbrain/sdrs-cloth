@@ -85,7 +85,7 @@ typename ARAP<N>::T ARAP<N>::evalGDirect(bool calcG,SMatT* H,int y0Off,bool proj
     _HBlks.resize(n());
   //We need to update Z to estimate gradient and Hessian using the inverse function theorem
   int savedNewtonIter=_newtonIter;
-  _newtonIter=20;   //This is heuristic, but typically 20 is enough
+  _newtonIter=100;   //This is heuristic, but typically 20 is enough
   updateZ(Epsilon<T>::finiteDifferenceEps());
   _newtonIter=savedNewtonIter;
   //Start estimation
@@ -396,6 +396,10 @@ template <int N>
 bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,bool projPSD) const {
   T D=0,DD=0;
   E=0;
+  if(G)
+    G->setZero();
+  if(H)
+    H->setZero();
   //ARAP
   Eigen::Map<const MatVT> R(_R.col(i).data());
   const auto& invF0=_invF0[i];
