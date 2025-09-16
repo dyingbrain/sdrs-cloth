@@ -423,19 +423,25 @@ bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,boo
   MatVT DDInv;
   VecVT dir,dir2;
   for(int fid=0; fid<N+1; fid++) {
+    //Energy/Gradient/Hessian with respect to the plane
+    T En=0;
+    VecVT Gn;
+    MatVT Hn;
     const auto& n=_z[fid].col(i);
-    if(H && !projPSD) {
-      DDInv.setZero();
+      Gn.setZero();
+      Hn.setZero();
       for(int d=1; d<=N; d++) {
         int vid=(fid+d)%(N+1),voff=vid*N;
         dir=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
-        Penalty::eval<FLOAT>(n.dot(dir),G?&D:NULL,H?&DD:NULL,0,1);
-        DDInv+=dir*dir.transpose()*DD;
+        En+=Penalty::eval<FLOAT>(n.dot(dir),G?&D:NULL,H?&DD:NULL,0,1);
+        Gn+=D*dir;
+        Hn+=dir*dir.transpose()*DD;
       }
-      for(int i=0;i<DDInv.rows();i++)
-		DDInv(i,i)+=std::max(DDInv(i,i),Epsilon<T>::finiteDifferenceEps());
-      DDInv=DDInv.inverse();
-    }
+    SmallScaleNewton<N,MatVT>::template energySoft<Penalty>(*this,n,En,&Gn,&Hn);
+    for(int i=0;i<N;i++)
+      Hn(i,i)=std::max(Hn(i,i),Epsilon<T>::finiteDifferenceEps());
+    Hn=Hn.inverse().eval();
+	//Energy/Gradient/Hessian with respect to the vertices
     for(int d=1; d<=N; d++) {
       int vid=(fid+d)%(N+1),voff=vid*N;
       dir=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
