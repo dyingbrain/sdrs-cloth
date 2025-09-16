@@ -10,7 +10,7 @@ struct OptimizerParam {
     ADMM,
     GD,
     NEWTON,
-    LM,
+    DIRECT_NEWTON,
     UNKNOWN,
   };
   T _tolXY=0;
@@ -24,6 +24,7 @@ struct OptimizerParam {
   T _initBetaX=1;
   T _initBetaY=0;
   T _collisionRemoveMargin=3;
+  T _psdEps=1e-6f;
   int _maxIter=1e4;
   int _checkI=1;
   int _printI=50;

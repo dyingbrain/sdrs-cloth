@@ -1,11 +1,11 @@
-#ifndef LM_H
-#define LM_H
+#ifndef DIRECT_NEWTON_H
+#define DIRECT_NEWTON_H
 
 #include "Newton.h"
 
 namespace PHYSICSMOTION {
 template <int N>
-class LM : public GradientDescend<N> {
+class DirectNewton : public Newton<N> {
  public:
   using typename Optimizer<N>::T;
   DECL_MAT_VEC_MAP_TYPES_T
@@ -17,9 +17,7 @@ class LM : public GradientDescend<N> {
   using typename Optimizer<N>::LinearConstraint;
   void optimize(const OptimizerParam& param) override;
 protected:
-  Vec assembleX();
-  T evalGD(const Vec& x,Vec* G,SMatT* H = NULL);
-  void solveSchur(Vec& x2,const Vec& x,const Vec& G,const Vec& H,T alpha);
+  T evalGD(const Vec& x,Vec* G,SMatT* H=NULL,bool projPSD=true);
   void debugGradient(const Vec& x);
 };
 }

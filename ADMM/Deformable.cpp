@@ -2,7 +2,7 @@
 #include "ADMM.h"
 #include "GradientDescend.h"
 #include "Newton.h"
-#include "LM.h"
+#include "DirectNewton.h"
 #include "CollisionSelf.h"
 #include "CollisionObstacle.h"
 #include "CollisionDetector.h"
@@ -244,7 +244,7 @@ void Deformable<N>::solve(const OptimizerParam& param) {
     _solver=NULL;
   else if(param._type==OptimizerParam::NEWTON && !std::dynamic_pointer_cast<Newton<N>>(_solver))
     _solver=NULL;
-  else if(param._type==OptimizerParam::LM && !std::dynamic_pointer_cast<LM<N>>(_solver))
+  else if(param._type==OptimizerParam::DIRECT_NEWTON && !std::dynamic_pointer_cast<DirectNewton<N>>(_solver))
     _solver=NULL;
   if(!_solver) {
     if(param._type==OptimizerParam::ADMM)
@@ -253,8 +253,8 @@ void Deformable<N>::solve(const OptimizerParam& param) {
       _solver.reset(new GradientDescend<N>);
     else if(param._type==OptimizerParam::NEWTON)
       _solver.reset(new Newton<N>);
-    else if(param._type==OptimizerParam::LM)
-      _solver.reset(new LM<N>);
+    else if(param._type==OptimizerParam::DIRECT_NEWTON)
+      _solver.reset(new DirectNewton<N>);
     else {
       ASSERT_MSG(false,"Unknown solver type!")
     }

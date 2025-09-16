@@ -17,6 +17,7 @@ class SmoothL1 : public OptimizerTerm {
   int n() const override;
   std::shared_ptr<OptimizerTerm> copy() const override;
   T evalG(bool calcG,bool initL,SMatT* H,int y0Off) override;
+  T evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) override;
   bool updateY(T betaY,T beta,T tolG) override;
   void reset(int mask) override;
   void debugEnergy(int M);

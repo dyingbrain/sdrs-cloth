@@ -47,6 +47,7 @@ class OptimizerTerm {
   virtual int n() const=0;
   virtual std::shared_ptr<OptimizerTerm> copy() const=0;
   virtual T evalG(bool calcG,bool initL,SMatT* H=NULL,int y0Off=-1)=0;
+  virtual T evalGDirect(bool calcG,SMatT* H=NULL,int y0Off=-1,bool projPSD=true);
   virtual bool updateY(T betaY,T beta,T tolG)=0;
   virtual bool updateZ(T tolG);
   virtual void updateL(T beta);

@@ -54,6 +54,10 @@ OptimizerTerm::VecCM OptimizerTerm::G0() const {
   static Vec G0V=Vec::Zero(0);
   return VecCM(G0V.data(),0);
 }
+OptimizerTerm::T OptimizerTerm::evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) {
+  //Direct evaluation is not implemented by default, it is more involved than evalG
+  FUNCTION_NOT_IMPLEMENTED
+}
 bool OptimizerTerm::updateZ(T tolG) {
   return true;
 }

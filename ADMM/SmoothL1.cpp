@@ -48,6 +48,10 @@ typename SmoothL1<N>::T SmoothL1<N>::evalG(bool calcG,bool initL,SMatT* H,int y0
   return g;
 }
 template <int N>
+typename SmoothL1<N>::T SmoothL1<N>::evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) {
+  return evalG(calcG,false,H,y0Off);
+}
+template <int N>
 bool SmoothL1<N>::updateY(T betaY,T beta,T tolG) {
   _evalgOnly=false;
   bool succ=true;

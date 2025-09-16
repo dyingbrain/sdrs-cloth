@@ -1,0 +1,105 @@
+#include "DirectNewton.h"
+#include <Utils/SparseUtils.h>
+#include <Utils/Timing.h>
+
+namespace PHYSICSMOTION {
+template <int N>
+void DirectNewton<N>::optimize(const OptimizerParam& param) {
+  Optimizer<N>::init(param._tolG);
+  T alpha=param._initAlpha,E,E2;
+  SMatT H;
+  std::string collString;
+  Vec x=GradientDescend<N>::assembleX(),x2,G,d;
+  //timing
+  double collTime=0,cbTime=0;
+  while(!Optimizer<N>::_cb());
+  TBEG();
+  //collision information
+  if(Optimizer<N>::_coll)
+    collString=Optimizer<N>::_coll->info(*this);
+  //main loop
+  for(int iter=1; iter<param._maxIter; iter++) {
+    //evaluate gradient
+    E=DirectNewton<N>::evalGD(x,&G,&H);
+    //find search direction
+    Newton<N>::solve(d,x,G,H,param._psdEps);
+    //line search
+    GradientDescend<N>::lineSearch(x2=x,E,d,alpha,param);
+    //step-size too small
+    if (alpha < param._tolAlpha)
+        break;
+    E2=DirectNewton<N>::evalGD(x2,NULL,NULL);
+    //termination
+    Optimizer<N>::project(G);
+    if (isfinite(E) && G.cwiseAbs().maxCoeff() < param._tolG)
+        break;
+    //print
+    bool doPrint=(iter%param._printI)==0;
+    bool doDebugGradient=param._debugGradientI>0 && (iter%param._debugGradientI)==0;
+    if(doPrint) {
+      TBEG();
+      while(!Optimizer<N>::_cb());
+      cbTime+=TENDV();
+      project(G);
+      T gNorm=G.cwiseAbs().maxCoeff();
+      std::cout << "Iter=" << iter
+                << " E=" << E
+                << " gNorm=" << gNorm
+                << " alpha=" << alpha
+                << " " << collString
+                << " TotalTime=" << TQUERYV() << " CollTime=" << collTime << " CBTime=" << cbTime << std::endl;
+    }
+    if(doDebugGradient)
+      DirectNewton<N>::debugGradient(x);
+  }
+  //timing
+  TENDV();
+}
+template <int N>
+typename DirectNewton<N>::T DirectNewton<N>::evalGD(const Vec& x,Vec* G,SMatT* H,bool projPSD) {
+  T E=0;
+  if(G)
+    G->setZero(x.size());
+  //term by term: f
+  int off=GradientDescend<N>::_g.size();
+  E+=x.segment(0,off).dot(Optimizer<N>::_H*x.segment(0,off))/2+Optimizer<N>::_g.dot(x.segment(0,off));
+  if(G)
+    G->segment(0,off)+=Optimizer<N>::_H*x.segment(0,off)+Optimizer<N>::_g;
+  if(H) {
+    STrips HTrips;
+    H->resize(x.size(),x.size());
+    addBlock(HTrips,0,0,Optimizer<N>::_H);
+    H->setFromTriplets(HTrips.begin(),HTrips.end());
+  }
+  //term by term: g
+  for(const auto& g:Optimizer<N>::_gss) {
+    g->y()=g->Ax()=g->A()*x.segment(0,g->A().cols());
+    int nY0=g->y0().size();
+    if(nY0>0)
+      g->y0()=x.segment(off,nY0);
+    E+=g->evalGDirect(G!=NULL,H,off,projPSD);
+    if(G) {
+      G->segment(0,g->A().cols())+=g->A().transpose()*g->G();
+      if(nY0>0)
+        G->segment(off,nY0)+=g->G0();
+    }
+    off+=g->y0().size();
+  }
+  return E;
+}
+template <int N>
+void DirectNewton<N>::debugGradient(const Vec& x) {
+  SMatT H;
+  Vec dx,G,G2;
+  T E=DirectNewton<N>::evalGD(x,&G,&H,false);
+  dx=Vec::Random(G.size());
+
+  DEFINE_NUMERIC_DELTA_T(T)
+  T E2=DirectNewton<N>::evalGD(x+dx*DELTA,&G2,NULL,false);
+  DEBUG_GRADIENT("G",G.dot(dx),G.dot(dx)-(E2-E)/DELTA)
+  DEBUG_GRADIENT("H",(H*dx).norm(),(H*dx-(G2-G)/DELTA).norm())
+}
+//instance
+template class DirectNewton<2>;
+template class DirectNewton<3>;
+}

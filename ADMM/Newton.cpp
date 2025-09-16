@@ -9,7 +9,7 @@ void Newton<N>::optimize(const OptimizerParam& param) {
   T alpha=1/param._initAlpha,E,E2;
   SMatT H;
   std::string collString;
-  Vec x=GradientDescend<N>::assembleX(),x2,G;
+  Vec x=GradientDescend<N>::assembleX(),x2,d,G;
   int nrZUpdateFail=0,nCollCheck=0;
   //timing
   double collTime=0,cbTime=0;
@@ -39,7 +39,9 @@ void Newton<N>::optimize(const OptimizerParam& param) {
       collTime+=TENDV();
     }
     //solve Newton's direction
-    solve(x2,x,G,H,alpha);
+    solve(d,x,G,H,alpha);
+    //We are use LM, so just update d
+    x2=x+d;
     //collision check
     if(Optimizer<N>::_coll) {
       TBEG();
@@ -98,20 +100,20 @@ void Newton<N>::optimize(const OptimizerParam& param) {
   TENDV();
 }
 template <int N>
-void Newton<N>::solve(Vec& x2,const Vec& x,const Vec& G,const SMatT& H,T alpha){
+void Newton<N>::solve(Vec& d,const Vec& x,const Vec& G,const SMatT& H,T alpha){
   _GKKT=concat<Vec>(G,Vec::Zero(Optimizer<N>::_Cons.rows()));
   _HKKT=buildKKT<T,0,int>(H,Optimizer<N>::_Cons,alpha);
   //Select solver based on PSD property of matrix
   if(Optimizer<N>::_Cons.size()==0) {
-    std::cout << "BEG-LDLT-Solve size=" << _HKKT.rows() << std::endl;
+    //std::cout << "BEG-LDLT-Solve size=" << _HKKT.rows() << std::endl;
     _invHSym.compute(_HKKT);
-    x2=x-_invHSym.solve(_GKKT);
-    std::cout << "END-LDLT-Solve" << std::endl;
+    d=-_invHSym.solve(_GKKT);
+    //std::cout << "END-LDLT-Solve" << std::endl;
   } else {
-    std::cout << "BEG-LU-Solve size=" << _HKKT.rows() << std::endl;
+    //std::cout << "BEG-LU-Solve size=" << _HKKT.rows() << std::endl;
     _invH.compute(_HKKT);
-    x2=x-_invH.solve(_GKKT).segment(0,x.size());
-    std::cout << "END-LU-Solve" << std::endl;
+    d=-_invH.solve(_GKKT).segment(0,x.size());
+    //std::cout << "END-LU-Solve" << std::endl;
   }
 }
 //instance
