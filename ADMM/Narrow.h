@@ -446,7 +446,7 @@ class Narrow<3,3> : public NarrowBase<3,3> {
   //extract
   static Eigen::Vector3d extract(const Vec& x,int off) {
     off*=3;
-    return Eigen::Vector3d(x[off],x[off+1],x[off+2]);
+    return Eigen::Vector3d((double)x[off],(double)x[off+1],(double)x[off+2]);
   }
   static Eigen::Vector3d extract(const MeshExact& obs,int off) {
     return obs.vss()[off].template cast<double>();

@@ -72,8 +72,8 @@ std::shared_ptr<DRAWER::CompositeShape> visualizeDeformable(Deformable<N>& def,G
   } else if(def.r()>0) {
     std::shared_ptr<DRAWER::MeshShape> m;
     if(N==2)
-      m=DRAWER::makeCircle(16,true,Eigen::Matrix<GLfloat,2,1>::Zero(),def.actualR());
-    else m=DRAWER::makeSphere(16,true,def.actualR());
+      m=DRAWER::makeCircle(16,true,Eigen::Matrix<GLfloat,2,1>::Zero(),(GLfloat)def.actualR());
+    else m=DRAWER::makeSphere(16,true,(GLfloat)def.actualR());
     std::shared_ptr<DRAWER::CompositeShape> s(new DRAWER::CompositeShape);
     Eigen::Matrix<GLfloat,3,1> pos=Eigen::Matrix<GLfloat,3,1>::Zero();
     for(int i=0; i<def.x().size(); i+=N) {

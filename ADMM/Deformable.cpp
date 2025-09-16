@@ -518,7 +518,7 @@ void Deformable<N>::buildFEMMassMatrix(STrips& HTrips,T coef) const {
     //insert entries
     for(int r=0; r<N+1; r++)
       for(int c=0; c<N+1; c++)
-        addBlockId(HTrips,t[r]*N,t[c]*N,N,coef*HCoef*H(r,c));
+        addBlockId<FLOAT>(HTrips,t[r]*N,t[c]*N,N,coef*HCoef*H(r,c));
   }
 }
 //instance

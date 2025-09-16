@@ -19,6 +19,7 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
   if(Optimizer<N>::_coll)
     collString=Optimizer<N>::_coll->info(*this);
   //main loop
+  Optimizer<N>::save(SLOT_BEFORE_Z_UPDATE,OptimizerTerm::MASK_Z);
   for(int iter=1; iter<param._maxIter; iter++) {
     //evaluate gradient
     E=DirectNewton<N>::evalGD(x,&G,&H);

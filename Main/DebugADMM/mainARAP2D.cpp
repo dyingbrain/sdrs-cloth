@@ -34,6 +34,7 @@ void createGrid(int N,int M,MeshExact& m) {
 #undef ID
 }
 int main(int argc,char** argv) {
+  mpfr_set_default_prec(1024);
   //build mesh grid
   MeshExact m,m2;
   createGrid(32,6,m);
