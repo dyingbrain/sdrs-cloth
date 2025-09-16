@@ -259,7 +259,7 @@ bool MassSpring<N>::energyYDirect(const VecNT& y, T& E, VecNT* G, MatNT* H, int 
     if(_lH[i]>0)
       HCoef+=DD2;
     *H=HCoef/(yLen*yLen)*y*y.transpose();
-    if(!projPSD)
+    if(!projPSD || GCoef>=0)
       *H+=GCoef*(MatNT::Identity()-y*y.transpose()/(yLen*yLen));
   }
   return true;
