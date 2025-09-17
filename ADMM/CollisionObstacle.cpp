@@ -119,11 +119,11 @@ typename CollisionObstacle<N,M,MO>::T CollisionObstacle<N,M,MO>::evalG(bool calc
   OMP_PARALLEL_FOR_
   for(int i=off; i<n(); i++) {
     T E;
-    VecNMT yd,G;
+    VecNMdT yd,G;
     CollisionMatrix<N,M> HBlk;
     yd.template segment<N*M>(0)=_Ax.col(i);
     yd[N*M]=_d0[i];
-    energyY(yd,E,&G,H?&HBlk:NULL,i);
+    energyYd(yd,E,&G,H?&HBlk:NULL,i);
     parallelAdd(g,E);
     if(calcG) {
       _G.col(i)=G.template segment<N*M>(0);
@@ -141,6 +141,32 @@ typename CollisionObstacle<N,M,MO>::T CollisionObstacle<N,M,MO>::evalG(bool calc
   return g;
 }
 template <int N,int M,int MO>
+typename CollisionObstacle<N,M,MO>::T CollisionObstacle<N,M,MO>::evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) {
+  T g=0;
+  if(calcG)
+    _G.resize(N*M,n());
+  if(H)
+    _HBlks.resize(n());
+  OMP_PARALLEL_FOR_
+  for(int i=0; i<n(); i++) {
+    T E;
+    VecNMT y=_Ax.col(i),G;
+    MatNMT HBlk;
+    energyYDirect(y,E,&G,H?&HBlk:NULL,i,projPSD);
+    parallelAdd(g,E);
+    if(calcG) {
+      _G.col(i)=G;
+    }
+    if(H) {
+      _HBlks[i]._blk=HBlk;
+      _HBlks[i]._nY=N*M;
+    }
+  }
+  if(H)
+    assembleHessian(*H,y0Off);
+  return g;
+}
+template <int N,int M,int MO>
 bool CollisionObstacle<N,M,MO>::updateY(T betaY,T beta,T tolG) {
   _evalgOnly=false;
   bool succ=true;
@@ -152,13 +178,13 @@ bool CollisionObstacle<N,M,MO>::updateY(T betaY,T beta,T tolG) {
   OMP_PARALLEL_FOR_
   for(int i=0; i<n(); i++) {
     T E;
-    VecNMT yd,G;
+    VecNMdT yd,G;
     CollisionMatrix<N,M> H;
     SmallScaleNewton<N*M+1,CollisionMatrix<N,M>> opt;
     yd.template segment<N*M>(0)=_y.col(i);
     yd[N*M]=_d0[i];
-    auto energyFunc=[&](const VecNMT& x,T& E,VecNMT* G,CollisionMatrix<N,M>* H)->bool {
-      return energyY(x,E,G,H,i);
+    auto energyFunc=[&](const VecNMdT& x,T& E,VecNMdT* G,CollisionMatrix<N,M>* H)->bool {
+      return energyYd(x,E,G,H,i);
     };
     if(!opt.optimize(_alphaY[i],yd,E,G,H,energyFunc,tolG))
       succ=false;
@@ -273,10 +299,10 @@ void CollisionObstacle<N,M,MO>::debugEnergy(int m,T tolG) {
     dz.setRandom();
     if(energyZ(z,E,&G,&H,i)) {
       //debug energy
-      VecNMT yd;
+      VecNMdT yd;
       yd.template segment<N*M>(0)=_y.col(i);
       yd[N*M]=_d0[i];
-      energyY(yd,E2,NULL,NULL,i);
+      energyYd(yd,E2,NULL,NULL,i);
       DEBUG_GRADIENT("E",E,E-E2)
       //derivative energy
       z2=z+dz*DELTA;
@@ -297,15 +323,15 @@ void CollisionObstacle<N,M,MO>::debugEnergy(int m,T tolG) {
     for(int i=0; i<m; i++) {
       T E,E2;
       CollisionMatrix<N,M> H;
-      VecNMT yd,yd2,dyd,G,G2;
+      VecNMdT yd,yd2,dyd,G,G2;
       yd.template segment<N*M>(0)=_y.col(i);
       yd[N*M]=_d0[i];
       dyd.setRandom();
       _evalgOnly=evalgOnly;
-      energyY(yd,E,&G,&H,i);
+      energyYd(yd,E,&G,&H,i);
       //derivative energy
       yd2=yd+dyd*DELTA;
-      energyY(yd2,E2,&G2,NULL,i);
+      energyYd(yd2,E2,&G2,NULL,i);
       DEBUG_GRADIENT("G",G.dot(dyd),G.dot(dyd)-(E2-E)/DELTA)
       DEBUG_GRADIENT("H",(H.toDense()*dyd).norm(),((G2-G)/DELTA-H.toDense()*dyd).norm())
     }
@@ -332,7 +358,7 @@ void CollisionObstacle<N,M,MO>::initializePlane(int i) {
   _d0[i]=-_z.col(i).dot((pAL+pBL).template segment<N>(0).template cast<T>())/2+_r/2;
 }
 template <int N,int M,int MO>
-bool CollisionObstacle<N,M,MO>::energyY(const VecNMT& yd,T& E,VecNMT* G,CollisionMatrix<N,M>* H,int i) const {
+bool CollisionObstacle<N,M,MO>::energyYd(const VecNMdT& yd,T& E,VecNMdT* G,CollisionMatrix<N,M>* H,int i) const {
   E=0;
   if(!_evalgOnly) {
     E+=_beta*(yd.template segment<N*M>(0)-_Ax.col(i)).squaredNorm()/2;
@@ -381,6 +407,35 @@ bool CollisionObstacle<N,M,MO>::energyY(const VecNMT& yd,T& E,VecNMT* G,Collisio
     if(H)
       H->addIdentity(M,DD);
   }
+  return true;
+}
+template <int N,int M,int MO>
+bool CollisionObstacle<N,M,MO>::energyYDirect(const VecNMT& y,T& E,VecNMT* G,MatNMT* H,int i,bool projPSD) const {
+  /*E = 0;
+  if(G)
+    G->setZero();
+  if(H) {
+    H->setZero();
+  VecNT pos;
+  T En;
+  VecNdT Gn;
+  MatNdT Hn;
+  Gn.setZero();
+  Hn.setZero();
+  int off=0,d0Off=N*M;
+  T D=0,DD=0,d0=_d0[i];
+  //positive shape
+  for(int r=0; r<M; r++,off+=N) {
+    pos=yd.template segment<N>(off);
+    E+=Penalty::eval<FLOAT>(_z.col(i).dot(pos)+d0-_r,G?&D:NULL,H?&DD:NULL,0,_coef);
+    if(!isfinite(E))
+      return false;
+    if(G)
+      G->template segment<N>(off)+=D*_z.col(i);
+    if(H)
+      H->template block<N,N>(off,off)+=DD*_z.col(i)*_z.col(i).transpose();
+    Hn+=;
+  }*/
   return true;
 }
 template <int N,int M,int MO>

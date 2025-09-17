@@ -399,7 +399,7 @@ bool ARAP<N>::energyYD(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i) const {
 }
 template <int N>
 bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,bool projPSD) const {
-  T D=0,DD=0,D2=0,DD2=0;
+  T D=0,DD=0;
   E=0;
   if(G)
     G->setZero();
@@ -426,33 +426,19 @@ bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,boo
     }
   //barrier
   VecVT dir,dir2;
-  MatVT DDInv,DD2Inv;
   for(int fid=0; fid<N+1; fid++) {
-    //Energy/Gradient/Hessian with respect to the plane
-    T En=0;
-    VecVT Gn;
-    MatVT Hn;
     const auto& n=_z[fid].col(i);
-    Gn.setZero();
+    MatVT Hn,DDInv[N+1];
     Hn.setZero();
-    for(int d=1; d<=N; d++) {
-      int vid=(fid+d)%(N+1),voff=vid*N;
-      dir=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
-      Penalty::eval<FLOAT>(n.dot(dir),G?&D:NULL,H?&DD:NULL,0,1);
-      Gn+=D*dir;
-      Hn+=dir*dir.transpose()*DD;
-    }
-    SmallScaleNewton<N,MatVT>::template energySoft<Penalty>(*this,n,En,&Gn,&Hn);
-    for(int i=0;i<N;i++)
-      Hn(i,i)=std::max(Hn(i,i),Epsilon<T>::finiteDifferenceEps());
-    Hn=Hn.inverse().eval();
+    T En=0;
+    SmallScaleNewton<N,MatVT>::template energySoft<Penalty>(*this,n,En,NULL,&Hn);
 	E+=En;
-    //Energy/Gradient/Hessian with respect to the vertices
+    //Energy/Gradient/Hessian with respect to the vertices/normal
     for(int d=1; d<=N; d++) {
       int vid=(fid+d)%(N+1),voff=vid*N;
       dir=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
       E+=Penalty::eval<FLOAT>(n.dot(dir),G?&D:NULL,H?&DD:NULL,0,1);
-      DDInv=D*MatVT::Identity()+DD*dir*n.transpose();
+      DDInv[d]=D*MatVT::Identity()+DD*dir*n.transpose();
       if(!isfinite(E))
         return false;
       if(G) {
@@ -464,14 +450,21 @@ bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,boo
         H->template block<N,N>(voff,N*(N+1))-=DD*n*n.transpose();
         H->template block<N,N>(N*(N+1),voff)-=DD*n*n.transpose();
         H->template block<N,N>(N*(N+1),N*(N+1))+=DD*n*n.transpose();
+        if(!projPSD)
+          Hn+=DD*dir*dir.transpose();
       }
-      if (H && !projPSD) {
+    }
+    if (H && !projPSD) {
+      //Compute hessian with respect to normal
+      for(int i=0;i<N;i++)
+        Hn(i,i)=std::max(Hn(i,i),Epsilon<T>::finiteDifferenceEps());
+      Hn=Hn.inverse().eval();
+      //Fill all cross terms
+      for(int d=1; d<=N; d++){
+        int vid=(fid+d)%(N+1),voff=vid*N;
         for(int d2=1; d2<=N; d2++) {
           int vid2=(fid+d2)%(N+1),voff2=vid2*N;
-          dir2=yd.template segment<N>(voff2)-yd.template segment<N>(N*(N+1));
-          Penalty::eval<FLOAT>(n.dot(dir2),&D2,&DD2,0,1);
-          DD2Inv=D2*MatVT::Identity()+DD2*dir2*n.transpose();
-          auto HCoef=-DDInv.transpose()*Hn*DD2Inv;
+          auto HCoef=-DDInv[d].transpose()*Hn*DDInv[d2];
           H->template block<N,N>(voff,voff2)+=HCoef;
           H->template block<N,N>(voff,N*(N+1))-=HCoef;
           H->template block<N,N>(N*(N+1),voff2)-=HCoef;

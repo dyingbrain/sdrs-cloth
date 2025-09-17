@@ -1042,6 +1042,6 @@ typename DeformedEnvironment<T>::MatT DeformedEnvironment<T>::DSDJ(const Eigen::
 }
 template class DeformedEnvironment<FLOAT>;
 #ifdef FORCE_ADD_DOUBLE_PRECISION
-template struct DeformedEnvironment<double>;
+template class DeformedEnvironment<double>;
 #endif
 }

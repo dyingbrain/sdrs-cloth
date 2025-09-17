@@ -13,10 +13,14 @@ class CollisionObstacle : public CLogx, public OptimizerTerm {
   typedef CLogx Penalty;
   typedef unsigned long long ID;
   typedef Eigen::Matrix<T,N,1> VecNT;
+  typedef Eigen::Matrix<T,N+1,1> VecNdT;
   typedef Eigen::Matrix<T,N,N> MatNT;
+  typedef Eigen::Matrix<T,N+1,N+1> MatNdT;
+  typedef Eigen::Matrix<T,N,N*M> MatNMT;
   typedef Eigen::Matrix<T,N,MO> MatNMOT;
   typedef Eigen::Matrix<T,N,-1> MatNXT;
-  typedef Eigen::Matrix<T,N*M+1,1> VecNMT;
+  typedef Eigen::Matrix<T,N*M+1,1> VecNMdT;
+  typedef Eigen::Matrix<T,N*M,1> VecNMT;
   CollisionObstacle(T r=0,T x0=1e-2f,T coef=1e-2f);
   const std::unordered_map<ID,int>& terms() const;
   void insertCollisions(const CollisionDetector<N,M>& detector);
@@ -27,6 +31,7 @@ class CollisionObstacle : public CLogx, public OptimizerTerm {
   int n() const override;
   std::shared_ptr<OptimizerTerm> copy() const override;
   T evalG(bool calcG,bool initL,SMatT* H,int y0Off) override;
+  T evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) override;
   bool updateY(T betaY,T beta,T tolG) override;
   bool updateZ(T tolG) override;
   void reset(int mask) override;
@@ -37,7 +42,8 @@ class CollisionObstacle : public CLogx, public OptimizerTerm {
  private:
   //helper
   void initializePlane(int i);
-  bool energyY(const VecNMT& yd,T& E,VecNMT* G,CollisionMatrix<N,M>* H,int i) const;
+  bool energyYd(const VecNMdT& yd,T& E,VecNMdT* G,CollisionMatrix<N,M>* H,int i) const;
+  bool energyYDirect(const VecNMT& y,T& E,VecNMT* G,MatNMT* H,int i,bool projPSD) const;
   bool energyZ(const VecNT& z,T& E,VecNT* G,MatNT* H,int i) const;
   //data
   Vec _d0,_Gd0;

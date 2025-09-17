@@ -113,11 +113,11 @@ typename CollisionSelf<N,M>::T CollisionSelf<N,M>::evalG(bool calcG,bool initL,S
   OMP_PARALLEL_FOR_
   for(int i=off; i<n(); i++) {
     T E;
-    VecNMMT yd,G;
+    VecNMMdT yd,G;
     CollisionMatrix<N,M*2> HBlk;
     yd.template segment<N*M*2>(0)=_Ax.col(i);
     yd[N*M*2]=_d0[i];
-    energyY(yd,E,&G,H?&HBlk:NULL,i);
+    energyYd(yd,E,&G,H?&HBlk:NULL,i);
     parallelAdd(g,E);
     if(calcG) {
       _G.col(i)=G.template segment<N*M*2>(0);
@@ -135,6 +135,12 @@ typename CollisionSelf<N,M>::T CollisionSelf<N,M>::evalG(bool calcG,bool initL,S
   return g;
 }
 template <int N,int M>
+typename CollisionSelf<N,M>::T CollisionSelf<N,M>::evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) {
+  _evalgOnly=true;
+  T g=0;
+  return g;
+}
+template <int N,int M>
 bool CollisionSelf<N,M>::updateY(T betaY,T beta,T tolG) {
   _evalgOnly=false;
   bool succ=true;
@@ -146,13 +152,13 @@ bool CollisionSelf<N,M>::updateY(T betaY,T beta,T tolG) {
   OMP_PARALLEL_FOR_
   for(int i=0; i<n(); i++) {
     T E;
-    VecNMMT yd,G;
+    VecNMMdT yd,G;
     CollisionMatrix<N,M*2> H;
     SmallScaleNewton<N*M*2+1,CollisionMatrix<N,M*2>> opt;
     yd.template segment<N*M*2>(0)=_y.col(i);
     yd[N*M*2]=_d0[i];
-    auto energyFunc=[&](const VecNMMT& x,T& E,VecNMMT* G,CollisionMatrix<N,M*2>* H)->bool {
-      return energyY(x,E,G,H,i);
+    auto energyFunc=[&](const VecNMMdT& x,T& E,VecNMMdT* G,CollisionMatrix<N,M*2>* H)->bool {
+      return energyYd(x,E,G,H,i);
     };
     if(!opt.optimize(_alphaY[i],yd,E,G,H,energyFunc,tolG))
       succ=false;
@@ -264,10 +270,10 @@ void CollisionSelf<N,M>::debugEnergy(int m,T tolG) {
     dz.setRandom();
     if(energyZ(z,E,&G,&H,i)) {
       //debug energy
-      VecNMMT yd;
+      VecNMMdT yd;
       yd.template segment<N*M*2>(0)=_y.col(i);
       yd[N*M*2]=_d0[i];
-      energyY(yd,E2,NULL,NULL,i);
+      energyYd(yd,E2,NULL,NULL,i);
       DEBUG_GRADIENT("E",E,E-E2)
       //derivative energy
       z2=z+dz*DELTA;
@@ -288,15 +294,15 @@ void CollisionSelf<N,M>::debugEnergy(int m,T tolG) {
     for(int i=0; i<m; i++) {
       T E,E2;
       CollisionMatrix<N,M*2> H;
-      VecNMMT yd,yd2,dyd,G,G2;
+      VecNMMdT yd,yd2,dyd,G,G2;
       yd.template segment<N*M*2>(0)=_y.col(i);
       yd[N*M*2]=_d0[i];
       dyd.setRandom();
       _evalgOnly=evalgOnly;
-      energyY(yd,E,&G,&H,i);
+      energyYd(yd,E,&G,&H,i);
       //derivative energy
       yd2=yd+dyd*DELTA;
-      energyY(yd2,E2,&G2,NULL,i);
+      energyYd(yd2,E2,&G2,NULL,i);
       DEBUG_GRADIENT("G",G.dot(dyd),G.dot(dyd)-(E2-E)/DELTA)
       DEBUG_GRADIENT("H",(H.toDense()*dyd).norm(),((G2-G)/DELTA-H.toDense()*dyd).norm())
     }
@@ -323,7 +329,7 @@ void CollisionSelf<N,M>::initializePlane(int i) {
   _d0[i]=-_z.col(i).dot((pAL+pBL).template segment<N>(0).template cast<T>())/2;
 }
 template <int N,int M>
-bool CollisionSelf<N,M>::energyY(const VecNMMT& yd,T& E,VecNMMT* G,CollisionMatrix<N,M*2>* H,int i) const {
+bool CollisionSelf<N,M>::energyYd(const VecNMMdT& yd,T& E,VecNMMdT* G,CollisionMatrix<N,M*2>* H,int i) const {
   E=0;
   if(!_evalgOnly) {
     E+=_beta*(yd.template segment<N*M*2>(0)-_Ax.col(i)).squaredNorm()/2;

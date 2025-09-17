@@ -15,7 +15,7 @@ class CollisionSelf : public CLogx, public OptimizerTerm {
   typedef Eigen::Matrix<T,N,1> VecNT;
   typedef Eigen::Matrix<T,N,N> MatNT;
   typedef Eigen::Matrix<T,N,-1> MatNXT;
-  typedef Eigen::Matrix<T,N*M*2+1,1> VecNMMT;
+  typedef Eigen::Matrix<T,N*M*2+1,1> VecNMMdT;
   CollisionSelf(T r=0,T x0=1e-2f,T coef=1e-2f);
   const std::unordered_map<ID,int>& terms() const;
   void insertCollisions(const CollisionDetector<N,M>& detector);
@@ -26,6 +26,7 @@ class CollisionSelf : public CLogx, public OptimizerTerm {
   int n() const override;
   std::shared_ptr<OptimizerTerm> copy() const override;
   T evalG(bool calcG,bool initL,SMatT* H,int y0Off) override;
+  T evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) override;
   bool updateY(T betaY,T beta,T tolG) override;
   bool updateZ(T tolG) override;
   void reset(int mask) override;
@@ -36,7 +37,7 @@ class CollisionSelf : public CLogx, public OptimizerTerm {
  private:
   //helper
   void initializePlane(int i);
-  bool energyY(const VecNMMT& yd,T& E,VecNMMT* G,CollisionMatrix<N,M*2>* H,int i) const;
+  bool energyYd(const VecNMMdT& yd,T& E,VecNMMdT* G,CollisionMatrix<N,M*2>* H,int i) const;
   bool energyZ(const VecNT& z,T& E,VecNT* G,MatNT* H,int i) const;
   //data
   Vec _d0,_Gd0;

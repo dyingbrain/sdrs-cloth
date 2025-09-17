@@ -17,7 +17,7 @@ struct SmallScaleNewton {
     //z is in the unit sphere
     T lenX=x.norm(),D=0,DD=0;
     VecNT pos=x/lenX;
-    E+=b.template eval<FLOAT>(1+b._x0-lenX,G?&D:NULL,H?&DD:NULL,0,1);
+    E+=b.template eval<FLOAT>(1+b._x0-lenX,(G||H)?&D:NULL,H?&DD:NULL,0,1);
     if(!isfinite(E))
       return false;
     pos=x/lenX;
