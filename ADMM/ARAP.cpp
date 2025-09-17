@@ -452,7 +452,7 @@ bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,boo
       int vid=(fid+d)%(N+1),voff=vid*N;
       dir=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
       E+=Penalty::eval<FLOAT>(n.dot(dir),G?&D:NULL,H?&DD:NULL,0,1);
-      DDInv=D*MatVT::Identity()+DD2*dir*n.transpose();
+      DDInv=D*MatVT::Identity()+DD*dir*n.transpose();
       if(!isfinite(E))
         return false;
       if(G) {
