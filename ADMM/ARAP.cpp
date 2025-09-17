@@ -85,9 +85,12 @@ typename ARAP<N>::T ARAP<N>::evalGDirect(bool calcG,SMatT* H,int y0Off,bool proj
     _HBlks.resize(n());
   //We need to update Z to estimate gradient and Hessian using the inverse function theorem
   int savedNewtonIter=_newtonIter;
+  bool savedUpdateR=_updateR;
   _newtonIter=100;   //This is heuristic, but typically 20 is enough
+  _updateR=projPSD;
   updateZ(Epsilon<T>::finiteDifferenceEps());
   _newtonIter=savedNewtonIter;
+  _updateR=savedUpdateR;
   //Start estimation
   OMP_PARALLEL_FOR_
   for(int i=0; i<n(); i++) {
@@ -190,6 +193,8 @@ bool ARAP<N>::updateZ(T tolG) {
       _z[d].col(i)=z;
     }
     //polar decomposition to compute R
+    if(!_updateR)
+      continue;
     for(int d=0; d<N; d++)
       F.col(d)=_y.col(i).template segment<N>((d+1)*N)-_y.col(i).template segment<N>(0);
     F*=_invF0[i];
@@ -394,7 +399,7 @@ bool ARAP<N>::energyYD(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i) const {
 }
 template <int N>
 bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,bool projPSD) const {
-  T D=0,DD=0;
+  T D=0,DD=0,D2=0,DD2=0;
   E=0;
   if(G)
     G->setZero();
@@ -420,32 +425,34 @@ bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,boo
             H->coeffRef(vid[rr],vid[cc])+=coef[rr]*coef[cc]*_k[i];
     }
   //barrier
-  MatVT DDInv;
   VecVT dir,dir2;
+  MatVT DDInv,DD2Inv;
   for(int fid=0; fid<N+1; fid++) {
     //Energy/Gradient/Hessian with respect to the plane
     T En=0;
     VecVT Gn;
     MatVT Hn;
     const auto& n=_z[fid].col(i);
-      Gn.setZero();
-      Hn.setZero();
-      for(int d=1; d<=N; d++) {
-        int vid=(fid+d)%(N+1),voff=vid*N;
-        dir=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
-        En+=Penalty::eval<FLOAT>(n.dot(dir),G?&D:NULL,H?&DD:NULL,0,1);
-        Gn+=D*dir;
-        Hn+=dir*dir.transpose()*DD;
-      }
+    Gn.setZero();
+    Hn.setZero();
+    for(int d=1; d<=N; d++) {
+      int vid=(fid+d)%(N+1),voff=vid*N;
+      dir=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
+      Penalty::eval<FLOAT>(n.dot(dir),G?&D:NULL,H?&DD:NULL,0,1);
+      Gn+=D*dir;
+      Hn+=dir*dir.transpose()*DD;
+    }
     SmallScaleNewton<N,MatVT>::template energySoft<Penalty>(*this,n,En,&Gn,&Hn);
     for(int i=0;i<N;i++)
       Hn(i,i)=std::max(Hn(i,i),Epsilon<T>::finiteDifferenceEps());
     Hn=Hn.inverse().eval();
-	//Energy/Gradient/Hessian with respect to the vertices
+	E+=En;
+    //Energy/Gradient/Hessian with respect to the vertices
     for(int d=1; d<=N; d++) {
       int vid=(fid+d)%(N+1),voff=vid*N;
       dir=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
       E+=Penalty::eval<FLOAT>(n.dot(dir),G?&D:NULL,H?&DD:NULL,0,1);
+      DDInv=D*MatVT::Identity()+DD2*dir*n.transpose();
       if(!isfinite(E))
         return false;
       if(G) {
@@ -461,12 +468,14 @@ bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,boo
       if (H && !projPSD) {
         for(int d2=1; d2<=N; d2++) {
           int vid2=(fid+d2)%(N+1),voff2=vid2*N;
-          dir2=yd.template segment<N>(voff)-yd.template segment<N>(N*(N+1));
-          DD=-dir.dot(DDInv*dir2);
-          H->template block<N,N>(voff,voff2)+=DD*n*n.transpose();
-          H->template block<N,N>(voff,N*(N+1))-=DD*n*n.transpose();
-          H->template block<N,N>(N*(N+1),voff2)-=DD*n*n.transpose();
-          H->template block<N,N>(N*(N+1),N*(N+1))+=DD*n*n.transpose();
+          dir2=yd.template segment<N>(voff2)-yd.template segment<N>(N*(N+1));
+          Penalty::eval<FLOAT>(n.dot(dir2),&D2,&DD2,0,1);
+          DD2Inv=D2*MatVT::Identity()+DD2*dir2*n.transpose();
+          auto HCoef=-DDInv.transpose()*Hn*DD2Inv;
+          H->template block<N,N>(voff,voff2)+=HCoef;
+          H->template block<N,N>(voff,N*(N+1))-=HCoef;
+          H->template block<N,N>(N*(N+1),voff2)-=HCoef;
+          H->template block<N,N>(N*(N+1),N*(N+1))+=HCoef;
         }
       }
     }

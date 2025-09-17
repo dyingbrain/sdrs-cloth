@@ -22,6 +22,7 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
   Optimizer<N>::save(SLOT_BEFORE_Z_UPDATE,OptimizerTerm::MASK_Z);
   for(int iter=1; iter<param._maxIter; iter++) {
     //evaluate gradient
+    debugGradient(x);
     E=DirectNewton<N>::evalGD(x,&G,&H);
     //find search direction
     Newton<N>::solve(d,x,G,H,param._psdEps);
@@ -101,6 +102,7 @@ void DirectNewton<N>::debugGradient(const Vec& x) {
   dx=Vec::Random(G.size());
 
   DEFINE_NUMERIC_DELTA_T(T)
+  DELTA=1e-8f;
   T E2=DirectNewton<N>::evalGD(x+dx*DELTA,&G2,NULL,false);
   DEBUG_GRADIENT("G",G.dot(dx),G.dot(dx)-(E2-E)/DELTA)
   DEBUG_GRADIENT("H",(H*dx).norm(),(H*dx-(G2-G)/DELTA).norm())

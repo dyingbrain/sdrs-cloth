@@ -47,6 +47,7 @@ class ARAP : public CLogx, public OptimizerTerm {
   std::vector<MatVT> _invF0;
   std::vector<T> _k;
   int _newtonIter=1;
+  bool _updateR=true;
   bool _debug=false;
 };
 }
