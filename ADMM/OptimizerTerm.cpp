@@ -91,6 +91,9 @@ void OptimizerTerm::load(int id,int mask) {
   if(mask&MASK_L)
     _L=_saved[id]->_L;
 }
+void OptimizerTerm::setDirectMode(bool direct) {
+  _directMode=direct;
+}
 //helper
 void OptimizerTerm::initializeL() {
   int cols=n();

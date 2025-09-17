@@ -32,6 +32,7 @@ std::shared_ptr<OptimizerTerm> ARAP<N>::copy() const {
 }
 template <int N>
 typename ARAP<N>::T ARAP<N>::evalG(bool calcG,bool initL,SMatT* H,int y0Off) {
+  assert(!_directMode);
   if(initL) {
     //initialize activation range
     for(int i=0; i<n(); i++) {
@@ -83,13 +84,10 @@ typename ARAP<N>::T ARAP<N>::evalGDirect(bool calcG,SMatT* H,int y0Off,bool proj
   }
   if(H)
     _HBlks.resize(n());
-  //We need to update Z to estimate gradient and Hessian using the inverse function theorem
-  int savedNewtonIter=_newtonIter;
+  assert(_directMode);
   bool savedUpdateR=_updateR;
-  _newtonIter=100;   //This is heuristic, but typically 20 is enough
   _updateR=projPSD;
   updateZ(Epsilon<T>::finiteDifferenceEps());
-  _newtonIter=savedNewtonIter;
   _updateR=savedUpdateR;
   //Start estimation
   OMP_PARALLEL_FOR_
@@ -180,7 +178,8 @@ bool ARAP<N>::updateZ(T tolG) {
       T E;
       MatVT H;
       VecVT z,G;
-      if(!opt.optimize(_alphaZ[d][i],z=_z[d].col(i),E,G,H,energyFunc,tolG,_newtonIter))
+      int newtonIter=_directMode?100:1; //A heuristic value
+      if(!opt.optimize(_alphaZ[d][i],z=_z[d].col(i),E,G,H,energyFunc,tolG,newtonIter))
         succ=false;
       _z[d].col(i)=z;
     }
@@ -302,10 +301,8 @@ void ARAP<N>::debugEnergy(int M,T tolG) {
   }
   
   bool projPSD=false;   //Otherwise, we are using Gauss-Newton hessian, which is not exact
-  int savedNewtonIter=_newtonIter;
-  bool savedUpdateR=_updateR;
-  _newtonIter=100;   //This is heuristic, but typically 20 is enough
-  _updateR=projPSD;
+  bool savedDirectMode=_directMode;
+  _directMode=true; //Optimize both n and d0
   //we finally debug energyYDDirect
   std::cout << "DebugEnergyYDDirect" << std::endl;
   //since we are using the inverse function theorem, the finite-difference epsilon cannot be too high
@@ -328,8 +325,7 @@ void ARAP<N>::debugEnergy(int M,T tolG) {
       DEBUG_GRADIENT("H",(H*dyd).norm(),((G2-G)/DELTA-H*dyd).norm())
     }
   }
-  _newtonIter=savedNewtonIter;
-  _updateR=savedUpdateR;
+  _directMode=savedDirectMode;
   _debug=false;
 }
 //helper

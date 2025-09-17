@@ -89,7 +89,7 @@ class Optimizer {
   void save(int id,int mask);
   void load(int id,int mask);
  protected:
-  void init(T tolG);
+  void init(T tolG,bool directMode=false);
   void project(Vec& G);
   bool updateZ(T tolG);
   //data

@@ -54,6 +54,7 @@ class OptimizerTerm {
   virtual void reset(int mask=MASK_Y|MASK_Y0|MASK_L|MASK_Z|MASK_ALPHA);
   virtual void save(int id,int mask);
   virtual void load(int id,int mask);
+  virtual void setDirectMode(bool direct);
  protected:
   void initializeL();
   void assembleHessian(SMatT& H,int y0Off);
@@ -66,6 +67,7 @@ class OptimizerTerm {
   SMatT _A;
   T _beta,_betaY;
   bool _evalgOnly;
+  bool _directMode=false;
 };
 }
 

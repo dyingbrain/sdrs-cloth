@@ -102,6 +102,7 @@ std::shared_ptr<OptimizerTerm> CollisionSelf<N,M>::copy() const {
 }
 template <int N,int M>
 typename CollisionSelf<N,M>::T CollisionSelf<N,M>::evalG(bool calcG,bool initL,SMatT* H,int y0Off) {
+  assert(!_directMode);
   _evalgOnly=true;
   T g=0;
   if(calcG) {
@@ -145,14 +146,8 @@ typename CollisionSelf<N,M>::T CollisionSelf<N,M>::evalGDirect(bool calcG,SMatT*
     _G.resize(N*M*2,n());
   if(H)
     _HBlks.resize(n());
-  //We need to optimize both z and d0
-  int savedNewtonIter=_newtonIter;
-  bool savedDirectMode=_directMode;
-  _newtonIter=100;   //This is heuristic, but typically 20 is enough
-  _directMode=true;
+  assert(_directMode);
   updateZ(Epsilon<T>::finiteDifferenceEps());
-  _newtonIter=savedNewtonIter;
-  _directMode=savedDirectMode;
   //Start estimation
   OMP_PARALLEL_FOR_
   for(int i=0; i<n(); i++) {
@@ -234,7 +229,8 @@ bool CollisionSelf<N,M>::updateZ(T tolG) {
       VecNdT z,G;
       z.template segment<N>(0)=_z.col(i);
       z[N]=_d0[i];
-      if(!opt.optimize(_alphaZ[i],z,E,G,H,energyFunc,tolG,_newtonIter))
+      int newtonIter=_directMode?100:1; //A heuristic value
+      if(!opt.optimize(_alphaZ[i],z,E,G,H,energyFunc,tolG,newtonIter))
         succ=false;
       _z.col(i)=z.template segment<N>(0);
       _d0[i]=z[N];
@@ -251,7 +247,8 @@ bool CollisionSelf<N,M>::updateZ(T tolG) {
       T E;
       MatNT H;
       VecNT z,G;
-      if(!opt.optimize(_alphaZ[i],z=_z.col(i),E,G,H,energyFunc,tolG,_newtonIter))
+      int newtonIter=_directMode?100:1; //A heuristic value
+      if(!opt.optimize(_alphaZ[i],z=_z.col(i),E,G,H,energyFunc,tolG,newtonIter))
         succ=false;
       _z.col(i)=z;
     }
@@ -356,9 +353,7 @@ void CollisionSelf<N,M>::debugEnergy(int m,T tolG) {
   updateY(_betaY,_beta,tolG);
   
   bool projPSD=false;   //Otherwise, we are using Gauss-Newton hessian, which is not exact
-  int savedNewtonIter=_newtonIter;
   bool savedDirectMode=_directMode;
-  _newtonIter=100;   //This is heuristic, but typically 20 is enough
   _directMode=true; //Optimize both n and d0
   //we finally debug energyYDDirect
   std::cout << "DebugEnergyYDirect" << std::endl;
@@ -380,7 +375,6 @@ void CollisionSelf<N,M>::debugEnergy(int m,T tolG) {
     DEBUG_GRADIENT("G",G.dot(dyd),G.dot(dyd)-(E2-E)/DELTA)
     DEBUG_GRADIENT("H",(H*dyd).norm(),((G2-G)/DELTA-H*dyd).norm())
   }
-  _newtonIter=savedNewtonIter;
   _directMode=savedDirectMode;
 }
 template <int N,int M>

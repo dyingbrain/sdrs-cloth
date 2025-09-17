@@ -23,6 +23,7 @@ std::shared_ptr<OptimizerTerm> MassSpring<N>::copy() const {
 }
 template <int N>
 typename MassSpring<N>::T MassSpring<N>::evalG(bool calcG,bool initL,SMatT* H,int y0Off) {
+  assert(!_directMode);
   if(initL) {
     //initialize activation range
     for(int i=0; i<n(); i++)
@@ -63,6 +64,7 @@ typename MassSpring<N>::T MassSpring<N>::evalGDirect(bool calcG,SMatT* H,int y0O
     _G.resize(N,n());
   if(H)
     _HBlks.resize(n());
+  assert(_directMode);
   OMP_PARALLEL_FOR_
   for(int i=0; i<n(); i++) {
     T E;

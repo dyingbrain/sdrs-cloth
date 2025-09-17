@@ -86,12 +86,14 @@ void Optimizer<N>::load(int id,int mask) {
 }
 //helper
 template <int N>
-void Optimizer<N>::init(T tolG) {
+void Optimizer<N>::init(T tolG,bool directMode) {
   for(const auto& g:Optimizer<N>::_gss) {
+    g->setDirectMode(false);
     g->reset();
     g->y()=g->Ax()=g->A()*Optimizer<N>::_x;
     g->updateZ(tolG);
     g->evalG(true,true);
+    g->setDirectMode(directMode);
   }
 }
 template <int N>

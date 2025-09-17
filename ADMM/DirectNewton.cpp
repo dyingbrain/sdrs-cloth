@@ -6,7 +6,7 @@ namespace PHYSICSMOTION {
 static const int SLOT_BEFORE_Z_UPDATE = 0;
 template <int N>
 void DirectNewton<N>::optimize(const OptimizerParam& param) {
-  Optimizer<N>::init(param._tolG);
+  Optimizer<N>::init(param._tolG,true);
   T alpha=param._initAlpha,E,E2;
   SMatT H;
   std::string collString;

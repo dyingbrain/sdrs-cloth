@@ -54,8 +54,6 @@ class CollisionObstacle : public CLogx, public OptimizerTerm {
   //param
   std::unordered_map<ID,int> _terms;
   std::vector<MatNMOT> _yObs;
-  bool _directMode=false;
-  int _newtonIter=1;
   T _r,_coef;
 };
 }

@@ -52,8 +52,6 @@ class CollisionSelf : public CLogx, public OptimizerTerm {
   std::vector<T> _alphaY,_alphaZ;
   //param
   std::unordered_map<ID,int> _terms;
-  bool _directMode=false;
-  int _newtonIter=1;
   T _r,_coef;
 };
 }
