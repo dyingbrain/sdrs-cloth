@@ -78,11 +78,15 @@ int CollisionSelf<N,M>::removeCollisions(T margin) {
 }
 template <int N,int M>
 typename CollisionSelf<N,M>::VecM CollisionSelf<N,M>::y0() {
-  return VecM(_d0.data(),_d0.size());
+  if(_directMode)
+    return VecM(NULL,0);
+  else return VecM(_d0.data(),_d0.size());
 }
 template <int N,int M>
 typename CollisionSelf<N,M>::VecCM CollisionSelf<N,M>::y0() const {
-  return VecCM(_d0.data(),_d0.size());
+  if(_directMode)
+    return VecCM(NULL,0);
+  else return VecCM(_d0.data(),_d0.size());
 }
 template <int N,int M>
 typename CollisionSelf<N,M>::VecCM CollisionSelf<N,M>::G0() const {
@@ -136,8 +140,37 @@ typename CollisionSelf<N,M>::T CollisionSelf<N,M>::evalG(bool calcG,bool initL,S
 }
 template <int N,int M>
 typename CollisionSelf<N,M>::T CollisionSelf<N,M>::evalGDirect(bool calcG,SMatT* H,int y0Off,bool projPSD) {
-  _evalgOnly=true;
   T g=0;
+  if(calcG)
+    _G.resize(N*M*2,n());
+  if(H)
+    _HBlks.resize(n());
+  //We need to optimize both z and d0
+  int savedNewtonIter=_newtonIter;
+  bool savedDirectMode=_directMode;
+  _newtonIter=100;   //This is heuristic, but typically 20 is enough
+  _directMode=true;
+  updateZ(Epsilon<T>::finiteDifferenceEps());
+  _newtonIter=savedNewtonIter;
+  _directMode=savedDirectMode;
+  //Start estimation
+  OMP_PARALLEL_FOR_
+  for(int i=0; i<n(); i++) {
+    T E;
+    VecNMMT y=_Ax.col(i),G;
+    MatNMMT HBlk;
+    energyYDirect(y,E,&G,H?&HBlk:NULL,i,projPSD);
+    parallelAdd(g,E);
+    if(calcG) {
+      _G.col(i)=G;
+    }
+    if(H) {
+      _HBlks[i]._blk=HBlk;
+      _HBlks[i]._nY=N*M*2;
+    }
+  }
+  if(H)
+    assembleHessian(*H,y0Off);
   return g;
 }
 template <int N,int M>
@@ -186,29 +219,42 @@ bool CollisionSelf<N,M>::updateZ(T tolG) {
     _alphaZ.resize(n(),1);
   OMP_PARALLEL_FOR_
   for(int i=0; i<n(); i++) {
-    //solve optimization to compute z
-    T E;
-    MatNT H;
-    VecNT z,G;
-    SmallScaleNewton<N,MatNT> opt;
-#ifdef OPTIMIZE_ON_SPHERE
-    auto energyFunc=[&](const VecNT& x,T& E,VecNT* G,MatNT* H)->bool {
-      return energyZ(x,E,G,H,i);
-    };
-    if(!opt.optimizeOnSphere(_alphaZ[i],z=_z.col(i),E,G,H,energyFunc,tolG))
-      succ=false;
-#else
-    auto energyFunc=[&](const VecNT& x,T& E,VecNT* G,MatNT* H)->bool {
-      if(!energyZ(x,E,G,H,i))
-        return false;
-      if(!SmallScaleNewton<N,MatNT>::template energySoft<Penalty>(*this,x,E,G,H))
-        return false;
-      return true;
-    };
-    if(!opt.optimize(_alphaZ[i],z=_z.col(i),E,G,H,energyFunc,tolG))
-      succ=false;
-#endif
-    _z.col(i)=z;
+    if(_directMode) {
+      //solve optimization to compute z and d0
+      SmallScaleNewton<N+1,MatNdT> opt;
+      auto energyFunc=[&](const VecNdT& x,T& E,VecNdT* G,MatNdT* H)->bool {
+        if(!energyZd(x,E,G,H,i))
+          return false;
+        if(!SmallScaleNewton<N,MatNdT>::template energySoft<Penalty,VecNdT>(*this,x,E,G,H))
+          return false;
+        return true;
+      };
+      T E;
+      MatNdT H;
+      VecNdT z,G;
+      z.template segment<N>(0)=_z.col(i);
+      z[N]=_d0[i];
+      if(!opt.optimize(_alphaZ[i],z,E,G,H,energyFunc,tolG,_newtonIter))
+        succ=false;
+      _z.col(i)=z.template segment<N>(0);
+      _d0[i]=z[N];
+    } else {
+      //solve optimization to compute z
+      SmallScaleNewton<N,MatNT> opt;
+      auto energyFunc=[&](const VecNT& x,T& E,VecNT* G,MatNT* H)->bool {
+        if(!energyZ(x,E,G,H,i))
+          return false;
+        if(!SmallScaleNewton<N,MatNT>::template energySoft<Penalty>(*this,x,E,G,H))
+          return false;
+        return true;
+      };
+      T E;
+      MatNT H;
+      VecNT z,G;
+      if(!opt.optimize(_alphaZ[i],z=_z.col(i),E,G,H,energyFunc,tolG,_newtonIter))
+        succ=false;
+      _z.col(i)=z;
+    }
   }
   return succ;
 }
@@ -383,6 +429,67 @@ bool CollisionSelf<N,M>::energyYd(const VecNMMdT& yd,T& E,VecNMMdT* G,CollisionM
   return true;
 }
 template <int N,int M>
+bool CollisionSelf<N,M>::energyYDirect(const VecNMMT& y,T& E,VecNMMT* G,MatNMMT* H,int i,bool projPSD) const {
+  E=0;
+  if(G)
+    G->setZero();
+  if(H)
+    H->setZero();
+  T D=0,DD=0;
+  MatNdT Hnd;
+  VecNdT nd,pos1=VecNdT::Ones();
+  nd.template segment<N>(0)=_z.col(i);
+  nd[N]=_d0[i];
+  Hnd.setZero();
+  T En=0;
+  if(!SmallScaleNewton<N,MatNdT>::template energySoft<Penalty,VecNdT>(*this,nd,En,NULL,&Hnd))
+    return false;
+  E+=En;
+  //positive shape
+  MatNNdT DDInv[M*2];
+  for(int r=0,off=0;r<M;r++,off+=N) {
+    pos1.template segment<N>(0)=y.template segment<N>(off);
+    E+=Penalty::eval<FLOAT>(nd.dot(pos1)-_r,G?&D:NULL,H?&DD:NULL,0,_coef);
+    DDInv[r]=DD*_z.col(i)*pos1.transpose();
+    DDInv[r].template block<N,N>(0,0)+=D*MatNT::Identity();
+    if(!isfinite(E))
+      return false;
+    if(G)
+      G->template segment<N>(off)+=D*_z.col(i);
+    if(H) {
+      H->template block<N,N>(off,off)+=DD*_z.col(i)*_z.col(i).transpose();
+      if(!projPSD)
+        Hnd+=pos1*pos1.transpose()*DD;
+    }
+  }
+  //negative shape
+  for(int r=0,off=0;r<M;r++,off+=N) {
+    pos1.template segment<N>(0)=y.template segment<N>(off);
+    E+=Penalty::eval<FLOAT>(-nd.dot(pos1)-_r,G?&D:NULL,H?&DD:NULL,0,_coef);
+    DDInv[r+M]=DD*_z.col(i)*pos1.transpose();
+    DDInv[r+M].template block<N,N>(0,0)-=D*MatNT::Identity();
+    if(!isfinite(E))
+      return false;
+    if(G)
+      G->template segment<N>(off)-=D*_z.col(i);
+    if(H) {
+      H->template block<N,N>(off,off)+=DD*_z.col(i)*_z.col(i).transpose();
+      if(!projPSD)
+        Hnd+=pos1*pos1.transpose()*DD;
+    }
+  }
+  if(H && !projPSD) {
+    //Compute hessian with respect to normal
+    for(int i=0;i<N;i++)
+      Hnd(i,i)=std::max(Hnd(i,i),Epsilon<T>::finiteDifferenceEps());
+    Hnd=Hnd.inverse().eval();
+    for(int r=0,off=0;r<M*2;r++,off+=N) 
+      for(int r2=0,off2=0;r2<M*2;r2++,off2+=N)
+        H->template block<N,N>(off,off2)+=-DDInv[r]*Hnd*DDInv[r2].transpose();
+  }
+  return true;
+}
+template <int N,int M>
 bool CollisionSelf<N,M>::energyZ(const VecNT& z,T& E,VecNT* G,MatNT* H,int i) const {
   E=0;
   if(G)
@@ -413,6 +520,40 @@ bool CollisionSelf<N,M>::energyZ(const VecNT& z,T& E,VecNT* G,MatNT* H,int i) co
       *G-=D*pos;
     if(H)
       *H+=DD*pos*pos.transpose();
+  }
+  return true;
+}
+template <int N,int M>
+bool CollisionSelf<N,M>::energyZd(const VecNdT& zd,T& E,VecNdT* G,MatNdT* H,int i) const {
+  E=0;
+  if(G)
+    G->setZero();
+  if(H)
+    H->setZero();
+  VecNdT pos1=VecNdT::Ones();
+  int off=0;
+  T D=0,DD=0;
+  //positive shape
+  for(int r=0; r<M; r++,off+=N) {
+    pos1.template segment<N>(0)=_y.template block<N,1>(off,i);
+    E+=Penalty::eval<FLOAT>(zd.dot(pos1)-_r,G?&D:NULL,H?&DD:NULL,0,_coef);
+    if(!isfinite(E))
+      return false;
+    if(G)
+      *G+=D*pos1;
+    if(H)
+      *H+=DD*pos1*pos1.transpose();
+  }
+  //negative shape
+  for(int r=0; r<M; r++,off+=N) {
+    pos1.template segment<N>(0)=_y.template block<N,1>(off,i);
+    E+=Penalty::eval<FLOAT>(-zd.dot(pos1)-_r,G?&D:NULL,H?&DD:NULL,0,_coef);
+    if(!isfinite(E))
+      return false;
+    if(G)
+      *G-=D*pos1;
+    if(H)
+      *H+=DD*pos1*pos1.transpose();
   }
   return true;
 }

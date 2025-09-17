@@ -84,11 +84,15 @@ int CollisionObstacle<N,M,MO>::removeCollisions(T margin) {
 }
 template <int N,int M,int MO>
 typename CollisionObstacle<N,M,MO>::VecM CollisionObstacle<N,M,MO>::y0() {
-  return VecM(_d0.data(),_d0.size());
+  if(_directMode)
+    return VecM(NULL,0);
+  else return VecM(_d0.data(),_d0.size());
 }
 template <int N,int M,int MO>
 typename CollisionObstacle<N,M,MO>::VecCM CollisionObstacle<N,M,MO>::y0() const {
-  return VecCM(_d0.data(),_d0.size());
+  if(_directMode)
+    return VecCM(NULL,0);
+  else return VecCM(_d0.data(),_d0.size());
 }
 template <int N,int M,int MO>
 typename CollisionObstacle<N,M,MO>::VecCM CollisionObstacle<N,M,MO>::G0() const {
@@ -147,6 +151,15 @@ typename CollisionObstacle<N,M,MO>::T CollisionObstacle<N,M,MO>::evalGDirect(boo
     _G.resize(N*M,n());
   if(H)
     _HBlks.resize(n());
+  //We need to optimize both z and d0
+  int savedNewtonIter=_newtonIter;
+  bool savedDirectMode=_directMode;
+  _newtonIter=100;   //This is heuristic, but typically 20 is enough
+  _directMode=true;
+  updateZ(Epsilon<T>::finiteDifferenceEps());
+  _newtonIter=savedNewtonIter;
+  _directMode=savedDirectMode;
+  //Start estimation
   OMP_PARALLEL_FOR_
   for(int i=0; i<n(); i++) {
     T E;
@@ -212,29 +225,42 @@ bool CollisionObstacle<N,M,MO>::updateZ(T tolG) {
     _alphaZ.resize(n(),1);
   OMP_PARALLEL_FOR_
   for(int i=0; i<n(); i++) {
-    //solve optimization to compute z
-    T E;
-    MatNT H;
-    VecNT z,G;
-    SmallScaleNewton<N,MatNT> opt;
-#ifdef OPTIMIZE_ON_SPHERE
-    auto energyFunc=[&](const VecNT& x,T& E,VecNT* G,MatNT* H)->bool {
-      return energyZ(x,E,G,H,i);
-    };
-    if(!opt.optimizeOnSphere(_alphaZ[i],z=_z.col(i),E,G,H,energyFunc,tolG))
-      succ=false;
-#else
-    auto energyFunc=[&](const VecNT& x,T& E,VecNT* G,MatNT* H)->bool {
-      if(!energyZ(x,E,G,H,i))
-        return false;
-      if(!SmallScaleNewton<N,MatNT>::template energySoft<Penalty>(*this,x,E,G,H))
-        return false;
-      return true;
-    };
-    if(!opt.optimize(_alphaZ[i],z=_z.col(i),E,G,H,energyFunc,tolG))
-      succ=false;
-#endif
-    _z.col(i)=z;
+    if(_directMode) {
+      //solve optimization to compute z and d0
+      SmallScaleNewton<N+1,MatNdT> opt;
+      auto energyFunc=[&](const VecNdT& x,T& E,VecNdT* G,MatNdT* H)->bool {
+        if(!energyZd(x,E,G,H,i))
+          return false;
+        if(!SmallScaleNewton<N,MatNdT>::template energySoft<Penalty,VecNdT>(*this,x,E,G,H))
+          return false;
+        return true;
+      };
+      T E;
+      MatNdT H;
+      VecNdT z,G;
+      z.template segment<N>(0)=_z.col(i);
+      z[N]=_d0[i];
+      if(!opt.optimize(_alphaZ[i],z,E,G,H,energyFunc,tolG,_newtonIter))
+        succ=false;
+      _z.col(i)=z.template segment<N>(0);
+      _d0[i]=z[N];
+    } else {
+      //solve optimization to compute z
+      SmallScaleNewton<N,MatNT> opt;
+      auto energyFunc=[&](const VecNT& x,T& E,VecNT* G,MatNT* H)->bool {
+        if(!energyZ(x,E,G,H,i))
+          return false;
+        if(!SmallScaleNewton<N,MatNT>::template energySoft<Penalty,VecNT>(*this,x,E,G,H))
+          return false;
+        return true;
+      };
+      T E;
+      MatNT H;
+      VecNT z,G;
+      if(!opt.optimize(_alphaZ[i],z=_z.col(i),E,G,H,energyFunc,tolG,_newtonIter))
+        succ=false;
+      _z.col(i)=z;
+    }
   }
   return succ;
 }
@@ -411,31 +437,58 @@ bool CollisionObstacle<N,M,MO>::energyYd(const VecNMdT& yd,T& E,VecNMdT* G,Colli
 }
 template <int N,int M,int MO>
 bool CollisionObstacle<N,M,MO>::energyYDirect(const VecNMT& y,T& E,VecNMT* G,MatNMT* H,int i,bool projPSD) const {
-  /*E = 0;
+  E=0;
   if(G)
     G->setZero();
-  if(H) {
+  if(H)
     H->setZero();
-  VecNT pos;
-  T En;
-  VecNdT Gn;
-  MatNdT Hn;
-  Gn.setZero();
-  Hn.setZero();
-  int off=0,d0Off=N*M;
-  T D=0,DD=0,d0=_d0[i];
+  T D=0,DD=0;
+  MatNdT Hnd;
+  VecNdT nd,pos1=VecNdT::Ones();
+  nd.template segment<N>(0)=_z.col(i);
+  nd[N]=_d0[i];
+  Hnd.setZero();
+  T En=0;
+  if(!SmallScaleNewton<N,MatNdT>::template energySoft<Penalty,VecNdT>(*this,nd,En,NULL,&Hnd))
+    return false;
+  E+=En;
   //positive shape
-  for(int r=0; r<M; r++,off+=N) {
-    pos=yd.template segment<N>(off);
-    E+=Penalty::eval<FLOAT>(_z.col(i).dot(pos)+d0-_r,G?&D:NULL,H?&DD:NULL,0,_coef);
+  MatNNdT DDInv[M];
+  for(int r=0,off=0;r<M;r++,off+=N) {
+    pos1.template segment<N>(0)=y.template segment<N>(off);
+    E+=Penalty::eval<FLOAT>(nd.dot(pos1)-_r,G?&D:NULL,H?&DD:NULL,0,_coef);
+    DDInv[r]=DD*_z.col(i)*pos1.transpose();
+    DDInv[r].template block<N,N>(0,0)+=D*MatNT::Identity();
     if(!isfinite(E))
       return false;
     if(G)
       G->template segment<N>(off)+=D*_z.col(i);
-    if(H)
+    if(H) {
       H->template block<N,N>(off,off)+=DD*_z.col(i)*_z.col(i).transpose();
-    Hn+=;
-  }*/
+      if(!projPSD)
+        Hnd+=pos1*pos1.transpose()*DD;
+    }
+  }
+  //negative shape
+  for(int r=0;r<MO;r++) {
+    pos1.template segment<N>(0)=_yObs[i].col(r);
+    E+=Penalty::eval<FLOAT>(-nd.dot(pos1),G?&D:NULL,H?&DD:NULL,0,_coef);
+    if(!isfinite(E))
+      return false;
+    if(H) {
+      if(!projPSD)
+        Hnd+=pos1*pos1.transpose()*DD;
+    }
+  }
+  if(H && !projPSD) {
+    //Compute hessian with respect to normal
+    for(int i=0;i<N;i++)
+      Hnd(i,i)=std::max(Hnd(i,i),Epsilon<T>::finiteDifferenceEps());
+    Hnd=Hnd.inverse().eval();
+    for(int r=0,off=0;r<M;r++,off+=N) 
+      for(int r2=0,off2=0;r2<M;r2++,off2+=N)
+        H->template block<N,N>(off,off2)+=-DDInv[r]*Hnd*DDInv[r2].transpose();
+  }
   return true;
 }
 template <int N,int M,int MO>
@@ -469,6 +522,40 @@ bool CollisionObstacle<N,M,MO>::energyZ(const VecNT& z,T& E,VecNT* G,MatNT* H,in
       *G-=D*pos;
     if(H)
       *H+=DD*pos*pos.transpose();
+  }
+  return true;
+}
+template <int N,int M,int MO>
+bool CollisionObstacle<N,M,MO>::energyZd(const VecNdT& zd,T& E,VecNdT* G,MatNdT* H,int i) const {
+  E=0;
+  if(G)
+    G->setZero();
+  if(H)
+    H->setZero();
+  VecNdT pos1=VecNdT::Ones();
+  int off=0;
+  T D=0,DD=0;
+  //positive shape
+  for(int r=0; r<M; r++,off+=N) {
+    pos1.template segment<N>(0)=_y.template block<N,1>(off,i);
+    E+=Penalty::eval<FLOAT>(zd.dot(pos1)-_r,G?&D:NULL,H?&DD:NULL,0,_coef);
+    if(!isfinite(E))
+      return false;
+    if(G)
+      *G+=D*pos1;
+    if(H)
+      *H+=DD*pos1*pos1.transpose();
+  }
+  //negative shape
+  for(int r=0; r<MO; r++) {
+    pos1.template segment<N>(0)=_yObs[i].col(r);
+    E+=Penalty::eval<FLOAT>(-zd.dot(pos1),G?&D:NULL,H?&DD:NULL,0,_coef);
+    if(!isfinite(E))
+      return false;
+    if(G)
+      *G-=D*pos1;
+    if(H)
+      *H+=DD*pos1*pos1.transpose();
   }
   return true;
 }

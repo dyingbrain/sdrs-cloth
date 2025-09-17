@@ -13,8 +13,13 @@ class CollisionSelf : public CLogx, public OptimizerTerm {
   typedef CLogx Penalty;
   typedef unsigned long long ID;
   typedef Eigen::Matrix<T,N,1> VecNT;
+  typedef Eigen::Matrix<T,N+1,1> VecNdT;
   typedef Eigen::Matrix<T,N,N> MatNT;
+  typedef Eigen::Matrix<T,N,N+1> MatNNdT;
+  typedef Eigen::Matrix<T,N+1,N+1> MatNdT;
   typedef Eigen::Matrix<T,N,-1> MatNXT;
+  typedef Eigen::Matrix<T,N*M*2,N*M*2> MatNMMT;
+  typedef Eigen::Matrix<T,N*M*2,1> VecNMMT;
   typedef Eigen::Matrix<T,N*M*2+1,1> VecNMMdT;
   CollisionSelf(T r=0,T x0=1e-2f,T coef=1e-2f);
   const std::unordered_map<ID,int>& terms() const;
@@ -38,13 +43,17 @@ class CollisionSelf : public CLogx, public OptimizerTerm {
   //helper
   void initializePlane(int i);
   bool energyYd(const VecNMMdT& yd,T& E,VecNMMdT* G,CollisionMatrix<N,M*2>* H,int i) const;
+  bool energyYDirect(const VecNMMT& y,T& E,VecNMMT* G,MatNMMT* H,int i,bool projPSD) const;
   bool energyZ(const VecNT& z,T& E,VecNT* G,MatNT* H,int i) const;
+  bool energyZd(const VecNdT& z,T& E,VecNdT* G,MatNdT* H,int i) const;
   //data
   Vec _d0,_Gd0;
   MatNXT _z;
   std::vector<T> _alphaY,_alphaZ;
   //param
   std::unordered_map<ID,int> _terms;
+  bool _directMode=false;
+  int _newtonIter=1;
   T _r,_coef;
 };
 }

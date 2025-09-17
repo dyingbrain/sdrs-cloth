@@ -168,33 +168,26 @@ bool ARAP<N>::updateZ(T tolG) {
   OMP_PARALLEL_FOR_
   for(int i=0; i<n(); i++) {
     //solve 4 optimizations to compute z
-    T E;
-    MatVT H,F;
-    VecVT z,G;
     SmallScaleNewton<N,MatVT> opt;
     for(int d=0; d<N+1; d++) {
-#ifdef OPTIMIZE_ON_SPHERE
-      auto energyFunc=[&](const VecVT& x,T& E,VecVT* G,MatVT* H)->bool {
-        return energyZ(x,E,G,H,i,d);
-      };
-      if(!opt.optimizeOnSphere(_alphaZ[d][i],z=_z[d].col(i),E,G,H,energyFunc,tolG,_newtonIter))
-        succ=false;
-#else
       auto energyFunc=[&](const VecVT& x,T& E,VecVT* G,MatVT* H)->bool {
         if(!energyZ(x,E,G,H,i,d))
           return false;
-        if(!SmallScaleNewton<N,MatVT>::template energySoft<Penalty>(*this,x,E,G,H))
+        if(!SmallScaleNewton<N,MatVT>::template energySoft<Penalty,VecVT>(*this,x,E,G,H))
           return false;
         return true;
       };
+      T E;
+      MatVT H;
+      VecVT z,G;
       if(!opt.optimize(_alphaZ[d][i],z=_z[d].col(i),E,G,H,energyFunc,tolG,_newtonIter))
         succ=false;
-#endif
       _z[d].col(i)=z;
     }
     //polar decomposition to compute R
     if(!_updateR)
       continue;
+    MatVT F;
     for(int d=0; d<N; d++)
       F.col(d)=_y.col(i).template segment<N>((d+1)*N)-_y.col(i).template segment<N>(0);
     F*=_invF0[i];
@@ -431,7 +424,8 @@ bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,boo
     MatVT Hn,DDInv[N+1];
     Hn.setZero();
     T En=0;
-    SmallScaleNewton<N,MatVT>::template energySoft<Penalty>(*this,n,En,NULL,&Hn);
+    if(!SmallScaleNewton<N,MatVT>::template energySoft<Penalty,VecVT>(*this,n,En,NULL,&Hn))
+      return false;
 	E+=En;
     //Energy/Gradient/Hessian with respect to the vertices/normal
     for(int d=1; d<=N; d++) {

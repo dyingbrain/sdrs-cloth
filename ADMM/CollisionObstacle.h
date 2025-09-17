@@ -15,6 +15,7 @@ class CollisionObstacle : public CLogx, public OptimizerTerm {
   typedef Eigen::Matrix<T,N,1> VecNT;
   typedef Eigen::Matrix<T,N+1,1> VecNdT;
   typedef Eigen::Matrix<T,N,N> MatNT;
+  typedef Eigen::Matrix<T,N,N+1> MatNNdT;
   typedef Eigen::Matrix<T,N+1,N+1> MatNdT;
   typedef Eigen::Matrix<T,N,N*M> MatNMT;
   typedef Eigen::Matrix<T,N,MO> MatNMOT;
@@ -45,6 +46,7 @@ class CollisionObstacle : public CLogx, public OptimizerTerm {
   bool energyYd(const VecNMdT& yd,T& E,VecNMdT* G,CollisionMatrix<N,M>* H,int i) const;
   bool energyYDirect(const VecNMT& y,T& E,VecNMT* G,MatNMT* H,int i,bool projPSD) const;
   bool energyZ(const VecNT& z,T& E,VecNT* G,MatNT* H,int i) const;
+  bool energyZd(const VecNdT& zd,T& E,VecNdT* G,MatNdT* H,int i) const;
   //data
   Vec _d0,_Gd0;
   MatNXT _z;
@@ -52,6 +54,8 @@ class CollisionObstacle : public CLogx, public OptimizerTerm {
   //param
   std::unordered_map<ID,int> _terms;
   std::vector<MatNMOT> _yObs;
+  bool _directMode=false;
+  int _newtonIter=1;
   T _r,_coef;
 };
 }
