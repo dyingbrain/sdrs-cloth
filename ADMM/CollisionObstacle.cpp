@@ -363,6 +363,34 @@ void CollisionObstacle<N,M,MO>::debugEnergy(int m,T tolG) {
     }
   }
   updateY(_betaY,_beta,tolG);
+  
+  bool projPSD=false;   //Otherwise, we are using Gauss-Newton hessian, which is not exact
+  int savedNewtonIter=_newtonIter;
+  bool savedDirectMode=_directMode;
+  _newtonIter=100;   //This is heuristic, but typically 20 is enough
+  _directMode=true; //Optimize both n and d0
+  //we finally debug energyYDDirect
+  std::cout << "DebugEnergyYDirect" << std::endl;
+  //since we are using the inverse function theorem, the finite-difference epsilon cannot be too high
+  DELTA = Epsilon<double>::finiteDifferenceEps();
+  for(int i=0; i<m; i++) {
+    T E,E2;
+    MatNMT H;
+    VecNMT yd,yd2,dyd,G,G2;
+    yd=_y.col(i);
+    dyd.setRandom();
+    updateZ(Epsilon<T>::finiteDifferenceEps());
+    energyYDirect(yd,E,&G,&H,i,projPSD);
+    //derivative energy
+    yd2=yd+dyd*DELTA;
+    _y.col(i)=yd2;
+    updateZ(Epsilon<T>::finiteDifferenceEps());
+    energyYDirect(yd2,E2,&G2,NULL,i,projPSD);
+    DEBUG_GRADIENT("G",G.dot(dyd),G.dot(dyd)-(E2-E)/DELTA)
+    DEBUG_GRADIENT("H",(H*dyd).norm(),((G2-G)/DELTA-H*dyd).norm())
+  }
+  _newtonIter=savedNewtonIter;
+  _directMode=savedDirectMode;
 }
 template <int N,int M,int MO>
 typename CollisionObstacle<N,M,MO>::T CollisionObstacle<N,M,MO>::eps() const {

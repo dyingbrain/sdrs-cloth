@@ -300,6 +300,36 @@ void ARAP<N>::debugEnergy(int M,T tolG) {
       }
     }
   }
+  
+  bool projPSD=false;   //Otherwise, we are using Gauss-Newton hessian, which is not exact
+  int savedNewtonIter=_newtonIter;
+  bool savedUpdateR=_updateR;
+  _newtonIter=100;   //This is heuristic, but typically 20 is enough
+  _updateR=projPSD;
+  //we finally debug energyYDDirect
+  std::cout << "DebugEnergyYDDirect" << std::endl;
+  //since we are using the inverse function theorem, the finite-difference epsilon cannot be too high
+  DELTA=Epsilon<double>::finiteDifferenceEps();
+  for(int i=0; i<M; i++) {
+    T E,E2;
+    MatYDT H;
+    VecYDT yd,yd2,dyd,G,G2;
+    yd.template segment<N*(N+1)>(0)=_y.col(i);
+    yd.template segment<N>(N*(N+1))=_d0.col(i);
+    dyd.setRandom();
+    updateZ(Epsilon<T>::finiteDifferenceEps());
+    if(energyYDDirect(yd,E,&G,&H,i,projPSD)) {
+      yd2=yd+dyd*DELTA;
+      _y.col(i)=yd2.template segment<N*(N+1)>(0);
+      _d0.col(i)=yd2.template segment<N>(N*(N+1));
+      updateZ(Epsilon<T>::finiteDifferenceEps());
+      energyYDDirect(yd2,E2,&G2,NULL,i,projPSD);
+      DEBUG_GRADIENT("G",G.dot(dyd),G.dot(dyd)-(E2-E)/DELTA)
+      DEBUG_GRADIENT("H",(H*dyd).norm(),((G2-G)/DELTA-H*dyd).norm())
+    }
+  }
+  _newtonIter=savedNewtonIter;
+  _updateR=savedUpdateR;
   _debug=false;
 }
 //helper

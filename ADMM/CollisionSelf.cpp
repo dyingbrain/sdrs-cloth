@@ -354,6 +354,34 @@ void CollisionSelf<N,M>::debugEnergy(int m,T tolG) {
     }
   }
   updateY(_betaY,_beta,tolG);
+  
+  bool projPSD=false;   //Otherwise, we are using Gauss-Newton hessian, which is not exact
+  int savedNewtonIter=_newtonIter;
+  bool savedDirectMode=_directMode;
+  _newtonIter=100;   //This is heuristic, but typically 20 is enough
+  _directMode=true; //Optimize both n and d0
+  //we finally debug energyYDDirect
+  std::cout << "DebugEnergyYDirect" << std::endl;
+  //since we are using the inverse function theorem, the finite-difference epsilon cannot be too high
+  DELTA = Epsilon<double>::finiteDifferenceEps();
+  for(int i=0; i<m; i++) {
+    T E,E2;
+    MatNMMT H;
+    VecNMMT yd,yd2,dyd,G,G2;
+    yd=_y.col(i);
+    dyd.setRandom();
+    updateZ(Epsilon<T>::finiteDifferenceEps());
+    energyYDirect(yd,E,&G,&H,i,projPSD);
+    //derivative energy
+    yd2=yd+dyd*DELTA;
+    _y.col(i)=yd2;
+    updateZ(Epsilon<T>::finiteDifferenceEps());
+    energyYDirect(yd2,E2,&G2,NULL,i,projPSD);
+    DEBUG_GRADIENT("G",G.dot(dyd),G.dot(dyd)-(E2-E)/DELTA)
+    DEBUG_GRADIENT("H",(H*dyd).norm(),((G2-G)/DELTA-H*dyd).norm())
+  }
+  _newtonIter=savedNewtonIter;
+  _directMode=savedDirectMode;
 }
 template <int N,int M>
 typename CollisionSelf<N,M>::T CollisionSelf<N,M>::eps() const {
@@ -463,7 +491,7 @@ bool CollisionSelf<N,M>::energyYDirect(const VecNMMT& y,T& E,VecNMMT* G,MatNMMT*
     }
   }
   //negative shape
-  for(int r=0,off=0;r<M;r++,off+=N) {
+  for(int r=0,off=N*M;r<M;r++,off+=N) {
     pos1.template segment<N>(0)=y.template segment<N>(off);
     E+=Penalty::eval<FLOAT>(-nd.dot(pos1)-_r,G?&D:NULL,H?&DD:NULL,0,_coef);
     DDInv[r+M]=DD*_z.col(i)*pos1.transpose();
@@ -534,7 +562,7 @@ bool CollisionSelf<N,M>::energyZd(const VecNdT& zd,T& E,VecNdT* G,MatNdT* H,int 
   int off=0;
   T D=0,DD=0;
   //positive shape
-  for(int r=0; r<M; r++,off+=N) {
+  for(int r=0;r<M;r++,off+=N) {
     pos1.template segment<N>(0)=_y.template block<N,1>(off,i);
     E+=Penalty::eval<FLOAT>(zd.dot(pos1)-_r,G?&D:NULL,H?&DD:NULL,0,_coef);
     if(!isfinite(E))
@@ -545,7 +573,7 @@ bool CollisionSelf<N,M>::energyZd(const VecNdT& zd,T& E,VecNdT* G,MatNdT* H,int 
       *H+=DD*pos1*pos1.transpose();
   }
   //negative shape
-  for(int r=0; r<M; r++,off+=N) {
+  for(int r=0;r<M;r++,off+=N) {
     pos1.template segment<N>(0)=_y.template block<N,1>(off,i);
     E+=Penalty::eval<FLOAT>(-zd.dot(pos1)-_r,G?&D:NULL,H?&DD:NULL,0,_coef);
     if(!isfinite(E))

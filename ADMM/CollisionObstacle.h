@@ -17,7 +17,7 @@ class CollisionObstacle : public CLogx, public OptimizerTerm {
   typedef Eigen::Matrix<T,N,N> MatNT;
   typedef Eigen::Matrix<T,N,N+1> MatNNdT;
   typedef Eigen::Matrix<T,N+1,N+1> MatNdT;
-  typedef Eigen::Matrix<T,N,N*M> MatNMT;
+  typedef Eigen::Matrix<T,N*M,N*M> MatNMT;
   typedef Eigen::Matrix<T,N,MO> MatNMOT;
   typedef Eigen::Matrix<T,N,-1> MatNXT;
   typedef Eigen::Matrix<T,N*M+1,1> VecNMdT;
