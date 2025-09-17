@@ -22,7 +22,8 @@ class CollisionDetector<N,1> : public CollisionChecker<N> {
   void generateBroadBF(const Vec& x,const Vec& x2,T eps,T epsObs,bool self,bool obs);
   void generateBroad(const Vec& x,const Vec& x2,T eps,T epsObs,bool self,bool obs);
   Eigen::Matrix<int,2,1> generate(const Vec& x,const Vec& x2,Optimizer<N>& opt,bool noNeighbhor,bool parallel,int restoreSlot) override;
-  Eigen::Matrix<int,2,1> remove(const Vec& x,Optimizer<N>& opt,T margin) override;
+  Eigen::Matrix<int,2,1> removeByDistance(const Vec& x,Optimizer<N>& opt,T margin) override;
+  Eigen::Matrix<int,2,1> removeByEnergy(const Vec& x,Optimizer<N>& opt,T thres) override;
   std::string info(const Optimizer<N>& opt) const override;
   //getter
   void extractPos(const MeshExact& m,Vec& x) const;

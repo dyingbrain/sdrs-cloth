@@ -187,17 +187,32 @@ Eigen::Matrix<int,2,1> CollisionDetector<N,M>::generate(const Vec& x,const Vec& 
   return ret;
 }
 template <int N,int M>
-Eigen::Matrix<int,2,1> CollisionDetector<N,M>::remove(const Vec& x,Optimizer<N>& opt,T margin) {
+Eigen::Matrix<int,2,1> CollisionDetector<N,M>::removeByDistance(const Vec& x,Optimizer<N>& opt,T margin) {
   std::shared_ptr<CollisionSelf<N,M>> self=opt.template findTerm<CollisionSelf<N,M>>();
   std::shared_ptr<CollisionObstacle<N,M>> obs=opt.template findTerm<CollisionObstacle<N,M>>();
   Eigen::Matrix<int,2,1> ret=Eigen::Matrix<int,2,1>::Zero();
   if(self) {
     self->Ax()=self->A()*x.segment(0,self->A().cols());
-    ret[0]=self->removeCollisions(self->eps()*margin);
+    ret[0]=self->removeCollisionsByDistance(self->eps()*margin);
   }
   if(obs) {
     obs->Ax()=obs->A()*x.segment(0,obs->A().cols());
-    ret[1]=obs->removeCollisions(obs->eps()*margin);
+    ret[1]=obs->removeCollisionsByDistance(obs->eps()*margin);
+  }
+  return ret;
+}
+template <int N,int M>
+Eigen::Matrix<int,2,1> CollisionDetector<N,M>::removeByEnergy(const Vec& x,Optimizer<N>& opt,T thres) {
+  std::shared_ptr<CollisionSelf<N,M>> self=opt.template findTerm<CollisionSelf<N,M>>();
+  std::shared_ptr<CollisionObstacle<N,M>> obs=opt.template findTerm<CollisionObstacle<N,M>>();
+  Eigen::Matrix<int,2,1> ret=Eigen::Matrix<int,2,1>::Zero();
+  if(self) {
+    self->Ax()=self->A()*x.segment(0,self->A().cols());
+    ret[0]=self->removeCollisionsByEnergy(thres);
+  }
+  if(obs) {
+    obs->Ax()=obs->A()*x.segment(0,obs->A().cols());
+    ret[1]=obs->removeCollisionsByEnergy(thres);
   }
   return ret;
 }

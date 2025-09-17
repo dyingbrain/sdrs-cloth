@@ -25,7 +25,9 @@ class CollisionObstacle : public CLogx, public OptimizerTerm {
   CollisionObstacle(T r=0,T x0=1e-2f,T coef=1e-2f);
   const std::unordered_map<ID,int>& terms() const;
   void insertCollisions(const CollisionDetector<N,M>& detector);
-  int removeCollisions(T margin);
+  int removeCollisions(const std::unordered_set<int>& deleteHash);
+  int removeCollisionsByDistance(T margin);
+  int removeCollisionsByEnergy(T thres);
   VecM y0() override;
   VecCM y0() const override;
   VecCM G0() const override;

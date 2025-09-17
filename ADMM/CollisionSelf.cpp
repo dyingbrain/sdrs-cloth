@@ -33,7 +33,33 @@ void CollisionSelf<N,M>::insertCollisions(const CollisionDetector<N,M>& detector
     }
 }
 template <int N,int M>
-int CollisionSelf<N,M>::removeCollisions(T margin) {
+int CollisionSelf<N,M>::removeCollisions(const std::unordered_set<int>& deleteHash) {
+  //fill hash
+  std::unordered_map<int,ID> invTerm;
+  for(auto t:_terms)
+    invTerm[t.second]=t.first;
+  //go ahead and remove
+  if(deleteHash.empty())
+    return (int)deleteHash.size();
+  OptimizerTerm::removeColumns(deleteHash,N*M*2);
+  //compact
+  int newSize=0;
+  _terms.clear();
+  for(int i=0; i<n(); i++)
+    if(deleteHash.find(i)==deleteHash.end()) {
+      _d0[newSize]=_d0[i];
+      _z.col(newSize)=_z.col(i);
+      _terms[invTerm[i]]=newSize;
+      newSize++;
+    }
+  //resize
+  _d0.conservativeResize(newSize);
+  _z.conservativeResize(_z.rows(),newSize);
+  ASSERT(newSize==(int)_terms.size())
+  return (int)deleteHash.size();
+}
+template <int N,int M>
+int CollisionSelf<N,M>::removeCollisionsByDistance(T margin) {
   std::vector<T> GJKResult(n());
   OMP_PARALLEL_FOR_
   for(int i=0; i<(int)GJKResult.size(); i++) {
@@ -49,32 +75,28 @@ int CollisionSelf<N,M>::removeCollisions(T margin) {
                      pAL,pBL,&intersect);
   }
   //fill hash
-  std::unordered_map<int,ID> invTerm;
-  for(auto t:_terms)
-    invTerm[t.second]=t.first;
   std::unordered_set<int> deleteHash;
   for(int i=0; i<(int)GJKResult.size(); i++)
     if(GJKResult[i]>margin)
       deleteHash.insert(i);
-  //go ahead and remove
-  if(deleteHash.empty())
-    return (int)deleteHash.size();
-  OptimizerTerm::removeColumns(deleteHash,N*M*2);
-  //compact
-  int newSize=0;
-  _terms.clear();
-  for(int i=0; i<(int)GJKResult.size(); i++)
-    if(deleteHash.find(i)==deleteHash.end()) {
-      _d0[newSize]=_d0[i];
-      _z.col(newSize)=_z.col(i);
-      _terms[invTerm[i]]=newSize;
-      newSize++;
-    }
-  //resize
-  _d0.conservativeResize(newSize);
-  _z.conservativeResize(_z.rows(),newSize);
-  ASSERT(newSize==(int)_terms.size())
-  return (int)deleteHash.size();
+  return removeCollisions(deleteHash);
+}
+template <int N,int M>
+int CollisionSelf<N,M>::removeCollisionsByEnergy(T thres) {
+  updateZ(Epsilon<T>::finiteDifferenceEps());
+  //Start estimation
+  std::vector<T> ess(n());
+  OMP_PARALLEL_FOR_
+  for(int i=0; i<n(); i++) {
+    VecNMMT y=_Ax.col(i);
+    energyYDirect(y,ess[i],NULL,NULL,i,false);
+  }
+  //fill hash
+  std::unordered_set<int> deleteHash;
+  for(int i=0; i<(int)ess.size(); i++)
+    if(ess[i]<thres)
+      deleteHash.insert(i);
+  return removeCollisions(deleteHash);
 }
 template <int N,int M>
 typename CollisionSelf<N,M>::VecM CollisionSelf<N,M>::y0() {

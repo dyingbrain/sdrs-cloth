@@ -42,7 +42,8 @@ class CollisionChecker {
   DECL_MAT_VEC_MAP_TYPES_T
   virtual ~CollisionChecker() = default;
   virtual Eigen::Matrix<int,2,1> generate(const Vec& x,const Vec& x2,Optimizer<N>& opt,bool noNeighbhor,bool parallel,int restoreSlot=-1)=0;
-  virtual Eigen::Matrix<int,2,1> remove(const Vec& x,Optimizer<N>& opt,T margin)=0;
+  virtual Eigen::Matrix<int,2,1> removeByDistance(const Vec& x,Optimizer<N>& opt,T margin)=0;
+  virtual Eigen::Matrix<int,2,1> removeByEnergy(const Vec& x,Optimizer<N>& opt,T thres)=0;
   virtual std::string info(const Optimizer<N>& opt) const=0;
 };
 template <int N>

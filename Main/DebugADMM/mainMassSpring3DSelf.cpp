@@ -107,7 +107,7 @@ void testStretch(int argc,char** argv,double alpha) {
   param._printI=1;
   param._debugGradientI=50;
   param._tolAlpha=1e-20;
-  param._type=OptimizerParam::ADMM;
+  param._type=OptimizerParam::DIRECT_NEWTON;
   solver.setCB([&]() {
     updateDeformable(s,solver);
     drawer.nextFrame();

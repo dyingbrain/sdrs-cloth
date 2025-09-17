@@ -84,7 +84,7 @@ void ADMM<N>::optimize(const OptimizerParam& param) {
         } else {
           nCollCheck++;
           if(param._collisionRemoveI>0 && nCollCheck%param._collisionRemoveI==0) {
-            numTerms=Optimizer<N>::_coll->remove(xCurrCollFree,*this,param._collisionRemoveMargin);
+            numTerms=Optimizer<N>::_coll->removeByDistance(xCurrCollFree,*this,param._collisionRemoveMargin);
             if(numTerms[0]>0 || numTerms[1]>0) {
               collString=Optimizer<N>::_coll->info(*this);
               //re-assemble LHS

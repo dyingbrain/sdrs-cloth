@@ -27,7 +27,7 @@ void GradientDescend<N>::optimize(const OptimizerParam& param) {
     if(Optimizer<N>::_coll && param._collisionRemoveI>0 && nCollCheck%param._collisionRemoveI==0) {
       TBEG();
       auto xCurrCollFree=x.segment(0,Optimizer<N>::_x.size());
-      Eigen::Matrix<int,2,1> numTerms=Optimizer<N>::_coll->remove(xCurrCollFree,*this,param._collisionRemoveMargin);
+      Eigen::Matrix<int,2,1> numTerms=Optimizer<N>::_coll->removeByDistance(xCurrCollFree,*this,param._collisionRemoveMargin);
       if(numTerms[0]>0 || numTerms[1]>0) {
         collString=Optimizer<N>::_coll->info(*this);
         //revert to last x
