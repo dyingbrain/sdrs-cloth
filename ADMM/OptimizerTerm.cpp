@@ -40,6 +40,8 @@ void OptimizerTerm::assembleA(int* nX) {
   _A.setFromTriplets(_E.begin(),_E.end());
 }
 int OptimizerTerm::m() const {
+  if(n()==0)
+    return 0;
   return _A.rows()/n();
 }
 OptimizerTerm::VecM OptimizerTerm::y0() {

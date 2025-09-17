@@ -11,6 +11,7 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
   SMatT H;
   std::string collString;
   Vec x=GradientDescend<N>::assembleX(),x2,G,d;
+  int nCollCheck=0;
   //timing
   double collTime=0,cbTime=0;
   while(!Optimizer<N>::_cb());
@@ -27,11 +28,36 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
     Newton<N>::solve(d,x,G,H,param._psdEps);
     //line search
     DirectNewton<N>::lineSearch(x2=x,E,d,alpha,param);
+    //collision check
+    if(Optimizer<N>::_coll) {
+      TBEG();
+      auto xLastCollFree=x.segment(0,Optimizer<N>::_x.size());
+      auto xCurrCollFree=x2.segment(0,Optimizer<N>::_x.size());
+      Eigen::Matrix<int,2,1> numTerms=Optimizer<N>::_coll->generate(xLastCollFree,xCurrCollFree,*this,true,true);
+      if(numTerms[0]>0 || numTerms[1]>0) {
+        collString=Optimizer<N>::_coll->info(*this);
+        //revert to last x
+        collTime+=TENDV();
+        continue;
+      }
+      collTime+=TENDV();
+    }
     //step-size too small
     if (alpha < param._tolAlpha)
         break;
     Optimizer<N>::_x=x2.segment(0,Optimizer<N>::_x.size());
     E2=DirectNewton<N>::evalGD(x2,NULL,NULL);
+    //collision remove by energy value
+    nCollCheck++;
+    if(Optimizer<N>::_coll && param._collisionRemoveI>0 && nCollCheck%param._collisionRemoveI==0) {
+      TBEG();
+      auto xCurrCollFree=x.segment(0,Optimizer<N>::_x.size());
+      Eigen::Matrix<int,2,1> numTerms=Optimizer<N>::_coll->removeByEnergy(xCurrCollFree,*this,Epsilon<T>::finiteDifferenceEps());
+      if(numTerms[0]>0 || numTerms[1]>0)
+        collString=Optimizer<N>::_coll->info(*this);
+      collTime+=TENDV();
+    }
+    //Accept solution
     x=x2;
     Optimizer<N>::save(SLOT_BEFORE_Z_UPDATE,OptimizerTerm::MASK_Z);
     //termination

@@ -38,6 +38,7 @@ void CollisionObstacle<N,M,MO>::insertCollisions(const CollisionDetector<N,M>& d
 }
 template <int N,int M,int MO>
 int CollisionObstacle<N,M,MO>::removeCollisions(const std::unordered_set<int>& deleteHash) {
+  int nOld=n();
   //fill hash
   std::unordered_map<int,ID> invTerm;
   for(auto t:_terms)
@@ -49,7 +50,7 @@ int CollisionObstacle<N,M,MO>::removeCollisions(const std::unordered_set<int>& d
   //compact
   int newSize=0;
   _terms.clear();
-  for(int i=0; i<n(); i++)
+  for(int i=0; i<nOld; i++)
     if(deleteHash.find(i)==deleteHash.end()) {
       _d0[newSize]=_d0[i];
       _z.col(newSize)=_z.col(i);
