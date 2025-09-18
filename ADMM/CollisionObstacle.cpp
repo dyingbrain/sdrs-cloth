@@ -526,7 +526,7 @@ bool CollisionObstacle<N,M,MO>::energyYDirect(const VecNMT& y,T& E,VecNMT* G,Mat
   }
   if(H && !projPSD) {
     //Compute hessian with respect to n and d0
-    for(int i=0;i<N;i++)
+    for(int i=0;i<=N;i++)
       Hnd(i,i)=std::max(Hnd(i,i),Epsilon<T>::finiteDifferenceEps());
     Hnd=Hnd.inverse().eval();
     for(int r=0,off=0;r<M;r++,off+=N) 

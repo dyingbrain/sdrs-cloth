@@ -524,7 +524,7 @@ bool CollisionSelf<N,M>::energyYDirect(const VecNMMT& y,T& E,VecNMMT* G,MatNMMT*
   }
   if(H && !projPSD) {
     //Compute hessian with respect to normal and d0
-    for(int i=0;i<N;i++)
+    for(int i=0;i<=N;i++)
       Hnd(i,i)=std::max(Hnd(i,i),Epsilon<T>::finiteDifferenceEps());
     Hnd=Hnd.inverse().eval();
     for(int r=0,off=0;r<M*2;r++,off+=N) 
