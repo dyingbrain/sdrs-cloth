@@ -185,6 +185,13 @@ std::string CollisionDetector<N,1>::info(const Optimizer<N>& opt) const {
     oss << "#ObsColl=" << obs->n();
   return oss.str();
 }
+template <int N>
+typename CollisionDetector<N,1>::T CollisionDetector<N,1>::getEps(Optimizer<N>& opt) const {
+  std::shared_ptr<CollisionSelf<N,1>> self=opt.template findTerm<CollisionSelf<N,1>>();
+  std::shared_ptr<CollisionObstacle<N,1>> obs=opt.template findTerm<CollisionObstacle<N,1>>();
+  T eps=self?self->eps()/2:0,epsObs=std::max<T>(obs->eps()-eps,0);
+  return std::max<T>(eps,epsObs);
+}
 //getter
 template <int N>
 void CollisionDetector<N,1>::extractPos(const MeshExact& m,Vec& x) const {

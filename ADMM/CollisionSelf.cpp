@@ -125,7 +125,6 @@ std::shared_ptr<OptimizerTerm> CollisionSelf<N,M>::copy() const {
 }
 template <int N,int M>
 typename CollisionSelf<N,M>::T CollisionSelf<N,M>::evalG(bool calcG,bool initL,SMatT* H,int y0Off) {
-  assert(!_directMode);
   _evalgOnly=true;
   T g=0;
   if(calcG) {

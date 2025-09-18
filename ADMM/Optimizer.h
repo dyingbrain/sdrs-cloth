@@ -45,6 +45,7 @@ class CollisionChecker {
   virtual Eigen::Matrix<int,2,1> removeByDistance(const Vec& x,Optimizer<N>& opt,T margin)=0;
   virtual Eigen::Matrix<int,2,1> removeByEnergy(const Vec& x,Optimizer<N>& opt,T thres)=0;
   virtual std::string info(const Optimizer<N>& opt) const=0;
+  virtual T getEps(Optimizer<N>& opt) const=0;
 };
 template <int N>
 class Optimizer {

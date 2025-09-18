@@ -131,7 +131,6 @@ std::shared_ptr<OptimizerTerm> CollisionObstacle<N,M,MO>::copy() const {
 }
 template <int N,int M,int MO>
 typename CollisionObstacle<N,M,MO>::T CollisionObstacle<N,M,MO>::evalG(bool calcG,bool initL,SMatT* H,int y0Off) {
-  assert(!_directMode);
   _evalgOnly=true;
   T g=0;
   if(calcG) {

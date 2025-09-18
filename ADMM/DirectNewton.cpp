@@ -20,12 +20,18 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
   if(Optimizer<N>::_coll)
     collString=Optimizer<N>::_coll->info(*this);
   //main loop
-  Optimizer<N>::save(SLOT_BEFORE_Z_UPDATE,OptimizerTerm::MASK_Z);
+  Optimizer<N>::save(SLOT_BEFORE_Z_UPDATE,OptimizerTerm::MASK_Z|OptimizerTerm::MASK_Y0);
   for(int iter=1; iter<param._maxIter; iter++) {
     //evaluate gradient
     E=DirectNewton<N>::evalGD(x,&G,&H);
     //find search direction
     Newton<N>::solve(d,x,G,H,param._psdEps);
+    //clamp step size to avoid excessively large number of collisions
+    if(iter==1 && Optimizer<N>::_coll) {
+      Vec sz=d.segment(0,Optimizer<N>::_x.size()).reshaped(N,Optimizer<N>::_x.size()/N).colwise().norm();
+      alpha=std::min<T>(alpha,Optimizer<N>::_coll->getEps(*this)/std::max<T>(sz.maxCoeff(),Epsilon<T>::finiteDifferenceEps()));
+	  std::cout << "Alpha clamped to " << alpha << " to avoid excessive collisions!" << std::endl;
+    }
     //line search
     DirectNewton<N>::lineSearch(x2=x,E,d,alpha,param);
     //collision check
@@ -36,15 +42,16 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
       Eigen::Matrix<int,2,1> numTerms=Optimizer<N>::_coll->generate(xLastCollFree,xCurrCollFree,*this,true,true);
       if(numTerms[0]>0 || numTerms[1]>0) {
         collString=Optimizer<N>::_coll->info(*this);
-        //revert to last x
+        //revert to last x and reduce alpha
+        alpha*=param._decAlpha*param._decAlpha;
         collTime+=TENDV();
         continue;
       }
       collTime+=TENDV();
     }
     //step-size too small
-    if (alpha < param._tolAlpha)
-        break;
+    if(alpha<param._tolAlpha)
+      break;
     Optimizer<N>::_x=x2.segment(0,Optimizer<N>::_x.size());
     E2=DirectNewton<N>::evalGD(x2,NULL,NULL);
     //collision remove by energy value
@@ -59,7 +66,7 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
     }
     //Accept solution
     x=x2;
-    Optimizer<N>::save(SLOT_BEFORE_Z_UPDATE,OptimizerTerm::MASK_Z);
+    Optimizer<N>::save(SLOT_BEFORE_Z_UPDATE,OptimizerTerm::MASK_Z|OptimizerTerm::MASK_Y0);
     //termination
     Optimizer<N>::project(G);
     if (isfinite(E) && G.cwiseAbs().maxCoeff() < param._tolG)
@@ -103,7 +110,7 @@ typename DirectNewton<N>::T DirectNewton<N>::evalGD(const Vec& x,Vec* G,SMatT* H
     H->setFromTriplets(HTrips.begin(),HTrips.end());
   }
   //term by term: g
-  Optimizer<N>::load(SLOT_BEFORE_Z_UPDATE,OptimizerTerm::MASK_Z);
+  Optimizer<N>::load(SLOT_BEFORE_Z_UPDATE,OptimizerTerm::MASK_Z|OptimizerTerm::MASK_Y0);
   for(const auto& g:Optimizer<N>::_gss) {
     g->y()=g->Ax()=g->A()*x.segment(0,g->A().cols());
     int nY0=g->y0().size();

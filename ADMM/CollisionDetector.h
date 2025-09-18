@@ -24,6 +24,7 @@ class CollisionDetector : public CollisionChecker<N> {
   Eigen::Matrix<int,2,1> removeByDistance(const Vec& x,Optimizer<N>& opt,T margin) override;
   Eigen::Matrix<int,2,1> removeByEnergy(const Vec& x,Optimizer<N>& opt,T thres) override;
   std::string info(const Optimizer<N>& opt) const override;
+  T getEps(Optimizer<N>& opt) const override;
   //getter
   void extractPos(const MeshExact& m,Vec& x) const;
   const std::vector<ID>& selfCollisions() const;
