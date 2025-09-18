@@ -58,7 +58,7 @@ void writeObj(const std::filesystem::path& path,const MeshExact& m) {
 }
 int main(int argc,char** argv) {
   //build mesh grid
-  int N=4;
+  int N=32;
   MeshExact m;
   createSkirt(N,1,8,m);
   //solver
