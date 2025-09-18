@@ -68,7 +68,7 @@ int main(int argc,char** argv) {
   solver.setB(1e1);
   solver.setCL(0.2);
   solver.setCH(1.5);
-  solver.setMargin(0.002);
+  solver.setMargin(0.02);
   solver.setG(Vec3T(0,0,-10));
   solver.setMassSpring(m);
   solver.setDt(0.05);

@@ -232,10 +232,18 @@ T distToSqrTriangle(const Eigen::Matrix<T,3,1>& pt,
   } catch (...) {
     systemInvertible=false;
   }
-  if(!bary.template cast<double>().array().isFinite().all())
-    systemInvertible=false;
-  if(!systemInvertible || bary.minCoeff()<0) {
-    T dist,minDist=std::numeric_limits<double>::max();
+  //we start from in plane distance
+  if(feat)
+    *feat=Eigen::Matrix<char,2,1>(-1,-1);
+  T dist,minDist=std::numeric_limits<double>::max();
+  //this indicates the in plane distance can be used
+  if(bary.template cast<double>().array().isFinite().all() && bary.minCoeff()>=0) {
+    cp=bary[0]*v[0]+bary[1]*v[1]+bary[2]*v[2];
+    minDist=(pt-cp).squaredNorm();
+  }
+  //but we still check for edges and vertices for the maximal robustness
+  systemInvertible=false;
+  if(!systemInvertible) {
     //edge
     bool needTestV[3]= {true,true,true};
     for(int d=0; d<3; d++) {
@@ -273,8 +281,7 @@ T distToSqrTriangle(const Eigen::Matrix<T,3,1>& pt,
           minDist=dist;
         }
       }
-  } else if(feat)
-    *feat=Eigen::Matrix<char,2,1>(-1,-1);
+  }
   cp=bary[0]*v[0]+bary[1]*v[1]+bary[2]*v[2];
   return (pt-cp).squaredNorm();
 }
