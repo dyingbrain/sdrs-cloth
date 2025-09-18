@@ -206,6 +206,7 @@ ADD_EXE(mainARAP3DFinger)
 
 ADD_EXE(mainMassSpring2D)
 #ADD_EXE(mainMassSpring3D)
+ADD_EXE(mainMassSpring3DSkirt)
 ADD_EXE(mainMassSpring2DLong)
 ADD_EXE(mainMassSpring2DLongBetaProfile)
 ADD_EXE(mainMassSpring3DLong)

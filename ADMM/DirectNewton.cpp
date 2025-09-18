@@ -27,11 +27,11 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
     //find search direction
     Newton<N>::solve(d,x,G,H,param._psdEps);
     //clamp step size to avoid excessively large number of collisions
-    if(iter==1 && Optimizer<N>::_coll) {
+    /*if (iter == 1 && Optimizer<N>::_coll) {
       Vec sz=d.segment(0,Optimizer<N>::_x.size()).reshaped(N,Optimizer<N>::_x.size()/N).colwise().norm();
       alpha=std::min<T>(alpha,Optimizer<N>::_coll->getEps(*this)/std::max<T>(sz.maxCoeff(),Epsilon<T>::finiteDifferenceEps()));
 	  std::cout << "Alpha clamped to " << alpha << " to avoid excessive collisions!" << std::endl;
-    }
+    }*/
     //line search
     DirectNewton<N>::lineSearch(x2=x,E,d,alpha,param);
     //collision check

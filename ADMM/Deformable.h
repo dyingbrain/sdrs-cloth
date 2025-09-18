@@ -68,6 +68,7 @@ class Deformable {
   void setObstacle(const MeshExact& mesh);
   void fix(int vid,T k,const VecNT* xStar=NULL);
   void fix(std::function<bool(const VecNT& a)> f,T k);
+  auto& getFix() {return _cons._fixes;}
   int findClosestVid(const VecNT& pos) const;
   void addL1(int id,const VecNT& pos,T k);
   void addL1(std::array<int,2> id,T k);
