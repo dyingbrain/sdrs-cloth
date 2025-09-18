@@ -509,8 +509,7 @@ bool CollisionObstacle<N,M,MO>::energyYDirect(const VecNMT& y,T& E,VecNMT* G,Mat
       G->template segment<N>(off)+=D*_z.col(i);
     if(H) {
       H->template block<N,N>(off,off)+=DD*_z.col(i)*_z.col(i).transpose();
-      if(!projPSD)
-        Hnd+=pos1*pos1.transpose()*DD;
+      Hnd+=pos1*pos1.transpose()*DD;
     }
   }
   //negative shape
@@ -519,10 +518,8 @@ bool CollisionObstacle<N,M,MO>::energyYDirect(const VecNMT& y,T& E,VecNMT* G,Mat
     E+=Penalty::eval<FLOAT>(-nd.dot(pos1),G?&D:NULL,H?&DD:NULL,0,_coef);
     if(!isfinite(E))
       return false;
-    if(H) {
-      if(!projPSD)
-        Hnd+=pos1*pos1.transpose()*DD;
-    }
+    if(H)
+      Hnd+=pos1*pos1.transpose()*DD;
   }
   if(H && !projPSD) {
     //Compute hessian with respect to n and d0

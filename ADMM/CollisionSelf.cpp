@@ -502,8 +502,7 @@ bool CollisionSelf<N,M>::energyYDirect(const VecNMMT& y,T& E,VecNMMT* G,MatNMMT*
       G->template segment<N>(off)+=D*_z.col(i);
     if(H) {
       H->template block<N,N>(off,off)+=DD*_z.col(i)*_z.col(i).transpose();
-      if(!projPSD)
-        Hnd+=pos1*pos1.transpose()*DD;
+      Hnd+=pos1*pos1.transpose()*DD;
     }
   }
   //negative shape
@@ -518,8 +517,7 @@ bool CollisionSelf<N,M>::energyYDirect(const VecNMMT& y,T& E,VecNMMT* G,MatNMMT*
       G->template segment<N>(off)-=D*_z.col(i);
     if(H) {
       H->template block<N,N>(off,off)+=DD*_z.col(i)*_z.col(i).transpose();
-      if(!projPSD)
-        Hnd+=pos1*pos1.transpose()*DD;
+      Hnd+=pos1*pos1.transpose()*DD;
     }
   }
   if(H && !projPSD) {
