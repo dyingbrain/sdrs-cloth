@@ -49,9 +49,16 @@ void createSkirt(int N,double r0,double r1,MeshExact& m) {
   m.init<double>(vss,iss);
 #undef ID
 }
+void writeObj(const std::filesystem::path& path,const MeshExact& m) {
+  std::ofstream os(path);
+  for(auto v:m.vss())
+    os << "v " << v[0] << " " << v[1] << " " << v[2] << std::endl;
+  for(auto i:m.iss())
+    os << "f " << i[0]+1 << " " << i[1]+1 << " " << i[2]+1 << std::endl;
+}
 int main(int argc,char** argv) {
   //build mesh grid
-  int N=32;
+  int N=4;
   MeshExact m;
   createSkirt(N,1,8,m);
   //solver
@@ -98,6 +105,12 @@ int main(int argc,char** argv) {
     drawer.mainLoop();
   }
 
+
+  //Avoid override
+  if(exists("MassSpring3DSkirt")) {
+    std::cout << "Path already exists." << std::endl;
+    return 0;
+  }
   //Run the simulation
   int dirId=0;
   double lastSwitchTime=0,speed=0.3;
@@ -108,7 +121,7 @@ int main(int argc,char** argv) {
   dirs.push_back(Deformable<3>::VecNT({1,0,1}).normalized());
   dirs.push_back(Deformable<3>::VecNT({0,1,1}).normalized());
   dirs.push_back(Deformable<3>::VecNT({1,1,0}).normalized());
-  recreate(std::filesystem::path("MassSpring3DSkirt"));
+  recreate("MassSpring3DSkirt");
   double time=0;
   int outputIter=0;
   while(outputIter<100000) {
@@ -124,7 +137,7 @@ int main(int argc,char** argv) {
       for(int i=0; i<(int)m.vss().size(); i++)
         m.vssNonConst()[i]=solver.x().template segment<3>(i*3).template cast<MeshExact::T>();
       VTKWriter<double> os("MassSpring3DSkirt","MassSpring3DSkirt/frame"+std::to_string(outputIter)+".vtk",true);
-      m.writeStr("MassSpring3DSkirt/frame"+std::to_string(outputIter)+".dat");
+      writeObj("MassSpring3DSkirt/frame"+std::to_string(outputIter)+".obj",m);
       m.writeVTK(os,MeshExact::Mat3X4T::Identity());
     }
     if(solver.dt()==0)
