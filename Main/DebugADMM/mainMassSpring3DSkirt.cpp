@@ -19,10 +19,10 @@ typedef FLOAT T;
 DECL_MAT_VEC_MAP_TYPES_T
 
 typedef std::unordered_map<int,std::pair<T,Deformable<3>::VecNT>> FIX;
-FIX move(const FIX& fix,double t) {
+FIX move(const FIX& fix,double t,typename Deformable<3>::VecNT dir,double rad=4) {
   FIX ret=fix;
   for (auto& p:ret) {
-    p.second.second[0]+=std::sin(t)*4;
+    p.second.second+=std::sin(t)*rad*dir;
   }
   return ret;
 }
@@ -73,61 +73,68 @@ int main(int argc,char** argv) {
   std::unordered_map<int,std::pair<T,Deformable<3>::VecNT>> fix=solver.getFix();
 
   //draw
-  Drawer drawer(argc,argv);
-  std::shared_ptr<CaptureGIFPlugin> ss(new CaptureGIFPlugin(GLFW_KEY_4,"screenshot.gif",drawer.FPS(),true));
-  drawer.addPlugin(std::shared_ptr<Plugin>(new CameraExportPlugin(GLFW_KEY_2,GLFW_KEY_3,"camera.dat")));
-  drawer.addPlugin(std::shared_ptr<Plugin>(new CaptureGIFPlugin(GLFW_KEY_1,"record.gif",drawer.FPS())));
+  {
+    Drawer drawer(argc,argv);
+    std::shared_ptr<CaptureGIFPlugin> ss(new CaptureGIFPlugin(GLFW_KEY_4,"screenshot.gif",drawer.FPS(),true));
+    drawer.addPlugin(std::shared_ptr<Plugin>(new CameraExportPlugin(GLFW_KEY_2,GLFW_KEY_3,"camera.dat")));
+    drawer.addPlugin(std::shared_ptr<Plugin>(new CaptureGIFPlugin(GLFW_KEY_1,"record.gif",drawer.FPS())));
 #define USE_LIGHT
 #ifdef USE_LIGHT
-  drawer.addLightSystem(2048,20);
-  drawer.getLight()->lightSz(10);
-  drawer.getLight()->addLight(Eigen::Matrix<GLfloat,3,1>(2,2,2),
-                              Eigen::Matrix<GLfloat,3,1>(1,1,1),
-                              Eigen::Matrix<GLfloat,3,1>(1,1,1),
-                              Eigen::Matrix<GLfloat,3,1>(0,0,0));
-  drawer.getLight()->autoAdjust(true);
+    drawer.addLightSystem(2048,20);
+    drawer.getLight()->lightSz(10);
+    drawer.getLight()->addLight(Eigen::Matrix<GLfloat,3,1>(2,2,2),
+                                Eigen::Matrix<GLfloat,3,1>(1,1,1),
+                                Eigen::Matrix<GLfloat,3,1>(1,1,1),
+                                Eigen::Matrix<GLfloat,3,1>(0,0,0));
+    drawer.getLight()->autoAdjust(true);
 #endif
+    auto s=visualizeDeformable(solver);
+    drawer.addShape(s);
+    drawer.addCamera3D(90,Eigen::Matrix<GLfloat,3,1>(0,0,1));
+    drawer.getCamera3D()->setManipulator(std::shared_ptr<CameraManipulator>(new FirstPersonCameraManipulator(drawer.getCamera3D())));
+    drawer.addPlugin(std::shared_ptr<Plugin>(new ImGuiPlugin([&]() {
+      drawer.getCamera3D()->getManipulator()->imGuiCallback();
+    })));
+    drawer.mainLoop();
+  }
 
+  //Run the simulation
+  int dirId=0;
+  double lastSwitchTime=0,speed=0.3;
+  std::vector<typename Deformable<3>::VecNT> dirs;
+  dirs.push_back(Deformable<3>::VecNT({1,0,0}).normalized());
+  dirs.push_back(Deformable<3>::VecNT({0,1,0}).normalized());
+  dirs.push_back(Deformable<3>::VecNT({0,0,1}).normalized());
+  dirs.push_back(Deformable<3>::VecNT({1,0,1}).normalized());
+  dirs.push_back(Deformable<3>::VecNT({0,1,1}).normalized());
+  dirs.push_back(Deformable<3>::VecNT({1,1,0}).normalized());
   recreate(std::filesystem::path("MassSpring3DSkirt"));
   double time=0;
   int outputIter=0;
-  auto s=visualizeDeformable(solver);
-  drawer.addShape(s);
-  drawer.addCamera3D(90,Eigen::Matrix<GLfloat,3,1>(0,0,1));
-  drawer.getCamera3D()->setManipulator(std::shared_ptr<CameraManipulator>(new FirstPersonCameraManipulator(drawer.getCamera3D())));
-  drawer.addPlugin(std::shared_ptr<Plugin>(new ImGuiPlugin([&]() {
-    drawer.getCamera3D()->getManipulator()->imGuiCallback();
-  })));
-  drawer.setKeyFunc([&](GLFWwindowPtr wnd,int key,int scan,int action,int mods,bool captured) {
-    if(captured)
-      return;
-    else if(key==GLFW_KEY_R && action==GLFW_PRESS)
-      sim=!sim;
-  });
-  drawer.setFrameFunc([&](std::shared_ptr<SceneNode>& node) {
-    if(sim) {
-      OptimizerParam param;
-      param._initBeta=1e2f;
-      param._tolG=1e-2f;
-      param._maxIter=1e4;
-      param._printI=1;
-      param._type=OptimizerParam::DIRECT_NEWTON;
-      solver.getFix()=move(fix,time);
-      solver.solve(param);
-      updateDeformable(s,solver);
-      {
-        for(int i=0; i<(int)m.vss().size(); i++)
-          m.vssNonConst()[i]=solver.x().template segment<3>(i*3).template cast<MeshExact::T>();
-        VTKWriter<double> os("MassSpring3DSkirt","MassSpring3DSkirt/frame"+std::to_string(outputIter)+".vtk",true);
-        m.writeStr("MassSpring3DSkirt/frame"+std::to_string(outputIter)+".dat");
-        m.writeVTK(os,MeshExact::Mat3X4T::Identity());
-      }
-      if(solver.dt()==0)
-        sim=false;
-      time+=solver.dt();
-      outputIter++;
+  while(outputIter<100000) {
+    OptimizerParam param;
+    param._initBeta=1e2f;
+    param._tolG=1e-2f;
+    param._maxIter=1e4;
+    param._printI=1;
+    param._type=OptimizerParam::DIRECT_NEWTON;
+    solver.getFix()=move(fix,time*speed,dirs[dirId]);
+    solver.solve(param);
+    {
+      for(int i=0; i<(int)m.vss().size(); i++)
+        m.vssNonConst()[i]=solver.x().template segment<3>(i*3).template cast<MeshExact::T>();
+      VTKWriter<double> os("MassSpring3DSkirt","MassSpring3DSkirt/frame"+std::to_string(outputIter)+".vtk",true);
+      m.writeStr("MassSpring3DSkirt/frame"+std::to_string(outputIter)+".dat");
+      m.writeVTK(os,MeshExact::Mat3X4T::Identity());
     }
-  });
-  drawer.mainLoop();
+    if(solver.dt()==0)
+      sim=false;
+    time+=solver.dt();
+    outputIter++;
+    if((time-lastSwitchTime)*speed>M_PI*2) {
+      lastSwitchTime=time;
+      dirId=(dirId+1)%dirs.size();
+    }
+  }
   return 0;
 }
