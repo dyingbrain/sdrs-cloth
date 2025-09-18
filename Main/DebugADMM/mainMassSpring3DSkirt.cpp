@@ -109,7 +109,7 @@ int main(int argc,char** argv) {
       OptimizerParam param;
       param._initBeta=1e2f;
       param._tolG=1e-2f;
-      param._maxIter=100;
+      param._maxIter=1e4;
       param._printI=1;
       param._type=OptimizerParam::DIRECT_NEWTON;
       solver.getFix()=move(fix,time);

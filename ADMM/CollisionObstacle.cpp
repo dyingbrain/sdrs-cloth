@@ -92,7 +92,7 @@ template <int N,int M,int MO>
 int CollisionObstacle<N,M,MO>::removeCollisionsByEnergy(T thres) {
   updateZ(Epsilon<T>::finiteDifferenceEps());
   //Start estimation
-  std::vector<T> ess(n());
+  std::vector<T> ess(n(),0);
   OMP_PARALLEL_FOR_
   for(int i=0; i<n(); i++) {
     VecNMT y=_Ax.col(i);
@@ -525,13 +525,21 @@ bool CollisionObstacle<N,M,MO>::energyYDirect(const VecNMT& y,T& E,VecNMT* G,Mat
     }
   }
   if(H && !projPSD) {
-    //Compute hessian with respect to normal
+    //Compute hessian with respect to n and d0
     for(int i=0;i<N;i++)
       Hnd(i,i)=std::max(Hnd(i,i),Epsilon<T>::finiteDifferenceEps());
     Hnd=Hnd.inverse().eval();
     for(int r=0,off=0;r<M;r++,off+=N) 
       for(int r2=0,off2=0;r2<M;r2++,off2+=N)
         H->template block<N,N>(off,off2)+=-DDInv[r]*Hnd*DDInv[r2].transpose();
+  }
+  if(H && projPSD) {
+    //Compute hessian with respect to d0
+    Hnd(N,N)=std::max(Hnd(N,N),Epsilon<T>::finiteDifferenceEps());
+    Hnd(N,N)=1/Hnd(N,N);
+    for(int r=0,off=0;r<M;r++,off+=N) 
+      for(int r2=0,off2=0;r2<M;r2++,off2+=N)
+        H->template block<N,N>(off,off2)+=-DDInv[r].col(N)*Hnd(N,N)*DDInv[r2].col(N).transpose();
   }
   return true;
 }

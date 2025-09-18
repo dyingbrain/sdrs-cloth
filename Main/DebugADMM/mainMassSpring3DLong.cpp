@@ -101,7 +101,7 @@ int main(int argc,char** argv) {
   param._initBetaX=5e3f;
   param._tolG=1e-2f;
   param._maxIter=1e6;
-  param._debugGradientI=1;
+  param._printI=1;
   param._type=OptimizerParam::DIRECT_NEWTON;
   solver.setCB([&]() {
     for(int i=0; i<(int)m.vss().size(); i++)
