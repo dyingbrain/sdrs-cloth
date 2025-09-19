@@ -171,7 +171,7 @@ bool ARAP<N>::updateZ(T tolG) {
       auto energyFunc=[&](const VecVT& x,T& E,VecVT* G,MatVT* H)->bool {
         if(!energyZ(x,E,G,H,i,d))
           return false;
-        if(!SmallScaleNewton<N,MatVT>::template energySoft<Penalty,VecVT>(*this,x,E,G,H))
+        if(!SmallScaleNewton<N,MatVT>::template energySoft<Penalty,VecVT>(*this,x,E,G,H,1))
           return false;
         return true;
       };
@@ -450,7 +450,7 @@ bool ARAP<N>::energyYDDirect(const VecYDT& yd,T& E,VecYDT* G,MatYDT* H,int i,boo
     MatVT Hn,DDInv[N+1];
     Hn.setZero();
     T En=0;
-    if(!SmallScaleNewton<N,MatVT>::template energySoft<Penalty,VecVT>(*this,n,En,NULL,&Hn))
+    if(!SmallScaleNewton<N,MatVT>::template energySoft<Penalty,VecVT>(*this,n,En,NULL,&Hn,1))
       return false;
 	E+=En;
     //Energy/Gradient/Hessian with respect to the vertices/normal

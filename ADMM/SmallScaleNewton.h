@@ -13,11 +13,11 @@ struct SmallScaleNewton {
   typedef Eigen::Matrix<T,N,N> MatNT;
   typedef std::function<bool(const VecNT&,T&,VecNT*,MAT_TYPE*)> Energy;
   template <typename BARRIER,typename VEC_TYPE>
-  static bool energySoft(const BARRIER& b,const VEC_TYPE& x,T& E,VEC_TYPE* G,MAT_TYPE* H) {
+  static bool energySoft(const BARRIER& b,const VEC_TYPE& x,T& E,VEC_TYPE* G,MAT_TYPE* H,T coef) {
     //z is in the unit sphere
     T lenX=x.template segment<N>(0).norm(),D=0,DD=0;
     VecNT pos=x.template segment<N>(0)/lenX;
-    E+=b.template eval<FLOAT>(1+b._x0-lenX,(G||H)?&D:NULL,H?&DD:NULL,0,1);
+    E+=b.template eval<FLOAT>(1+b._x0-lenX,(G||H)?&D:NULL,H?&DD:NULL,0,coef);
     if(!isfinite(E))
       return false;
     pos=x.template segment<N>(0)/lenX;

@@ -248,7 +248,7 @@ bool CollisionObstacle<N,M,MO>::updateZ(T tolG) {
       auto energyFunc=[&](const VecNdT& x,T& E,VecNdT* G,MatNdT* H)->bool {
         if(!energyZd(x,E,G,H,i))
           return false;
-        if(!SmallScaleNewton<N,MatNdT>::template energySoft<Penalty,VecNdT>(*this,x,E,G,H))
+        if(!SmallScaleNewton<N,MatNdT>::template energySoft<Penalty,VecNdT>(*this,x,E,G,H,_coef))
           return false;
         return true;
       };
@@ -268,7 +268,7 @@ bool CollisionObstacle<N,M,MO>::updateZ(T tolG) {
       auto energyFunc=[&](const VecNT& x,T& E,VecNT* G,MatNT* H)->bool {
         if(!energyZ(x,E,G,H,i))
           return false;
-        if(!SmallScaleNewton<N,MatNT>::template energySoft<Penalty,VecNT>(*this,x,E,G,H))
+        if(!SmallScaleNewton<N,MatNT>::template energySoft<Penalty,VecNT>(*this,x,E,G,H,_coef))
           return false;
         return true;
       };
@@ -493,7 +493,7 @@ bool CollisionObstacle<N,M,MO>::energyYDirect(const VecNMT& y,T& E,VecNMT* G,Mat
   nd[N]=_d0[i];
   Hnd.setZero();
   T En=0;
-  if(!SmallScaleNewton<N,MatNdT>::template energySoft<Penalty,VecNdT>(*this,nd,En,NULL,&Hnd))
+  if(!SmallScaleNewton<N,MatNdT>::template energySoft<Penalty,VecNdT>(*this,nd,En,NULL,&Hnd,_coef))
     return false;
   E+=En;
   //positive shape

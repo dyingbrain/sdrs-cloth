@@ -33,6 +33,7 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
 	  std::cout << "Alpha clamped to " << alpha << " to avoid excessive collisions!" << std::endl;
     }
     //line search
+    alpha=std::min<T>(alpha,1);
     DirectNewton<N>::lineSearch(x2=x,E,d,alpha,param);
     //collision check
     if(Optimizer<N>::_coll) {
