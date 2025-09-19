@@ -26,21 +26,21 @@ FIX move(const FIX& fix,double t,typename Deformable<3>::VecNT dir,double rad=4)
   }
   return ret;
 }
-void createSkirt(int N,double r0,double r1,MeshExact& m) {
-#define ID(I,J) ((I)%N)+(J)*N
+void createSkirt(int N1,int N2,double r0,double r1,MeshExact& m) {
+#define ID(I,J) ((I)%N1)+(J)*N1
   std::vector<Eigen::Matrix<double,3,1>> vss;
   std::vector<Eigen::Matrix<int,3,1>> iss;
   //vss
-  double dr=2*M_PI*r0/N;
+  double dr=2*M_PI*r1/N2;
   for(double r=r0;r<=r1+dr;r+=dr) {
-    for(int d=0;d<N;d++) {
-      double angle=2*M_PI*(d+0.5)/N;
+    for(int d=0;d<N1;d++) {
+      double angle=2*M_PI*(d+0.5)/N1;
       vss.push_back(Eigen::Matrix<double,3,1>(std::cos(angle),std::sin(angle),0)*r);
     }
   }
   //iss
-  int NRing=(int)vss.size()/N;
-  for(int d=0;d<N;d++) {
+  int NRing=(int)vss.size()/N1;
+  for(int d=0;d<N1;d++) {
     for(int d2=0;d2<NRing-1;d2++) {
       iss.push_back(Eigen::Matrix<int,3,1>(ID(d,d2),ID(d,d2+1),ID(d+1,d2+1)));
       iss.push_back(Eigen::Matrix<int,3,1>(ID(d,d2),ID(d+1,d2+1),ID(d+1,d2)));
@@ -58,14 +58,14 @@ void writeObj(const std::filesystem::path& path,const MeshExact& m) {
 }
 int main(int argc,char** argv) {
   //build mesh grid
-  int N=32;
   MeshExact m;
-  createSkirt(N,1,8,m);
+  int N1=64,N2=32;
+  createSkirt(N1,N2,1,10,m);
   //solver
   bool sim=false;
   Deformable<3> solver;
-  solver.setK(1e2);
-  solver.setB(1e1);
+  solver.setK(1e4);
+  solver.setB(1e2);
   solver.setCL(0.2);
   solver.setCH(1.5);
   solver.setMargin(0.005);
@@ -113,7 +113,7 @@ int main(int argc,char** argv) {
   }
   //Run the simulation
   int dirId=0;
-  double lastSwitchTime=0,speed=0.3;
+  double lastSwitchTime=0,speed=1;
   std::vector<typename Deformable<3>::VecNT> dirs;
   dirs.push_back(Deformable<3>::VecNT({1,0,0}).normalized());
   dirs.push_back(Deformable<3>::VecNT({0,1,0}).normalized());
