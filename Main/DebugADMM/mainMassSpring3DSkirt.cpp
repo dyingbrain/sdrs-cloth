@@ -65,13 +65,13 @@ int main(int argc,char** argv) {
   bool sim=false;
   Deformable<3> solver;
   solver.setK(1e4);
-  solver.setB(1e2);
+  solver.setB(1e3);
   solver.setCL(0.2);
   solver.setCH(1.5);
   solver.setMargin(0.005);
   solver.setG(Vec3T(0,0,-10));
   solver.setMassSpring(m);
-  solver.setDt(0.05);
+  solver.setDt(0.001);
   solver.fix([](const Deformable<3>::VecNT& v){
     return v.norm()<=1.1;
   },1e4);
@@ -112,8 +112,6 @@ int main(int argc,char** argv) {
     return 0;
   }
   //Run the simulation
-  int dirId=0;
-  double lastSwitchTime=0,speed=1;
   std::vector<typename Deformable<3>::VecNT> dirs;
   dirs.push_back(Deformable<3>::VecNT({1,0,0}).normalized());
   dirs.push_back(Deformable<3>::VecNT({0,1,0}).normalized());
@@ -122,8 +120,10 @@ int main(int argc,char** argv) {
   dirs.push_back(Deformable<3>::VecNT({0,1,1}).normalized());
   dirs.push_back(Deformable<3>::VecNT({1,1,0}).normalized());
   recreate("MassSpring3DSkirt");
+  int dirId=0;
   double time=0;
-  int outputIter=0;
+  int outputIter=0,frame=0;
+  double lastSwitchTime=0,speed=1;
   while(outputIter<100000) {
     OptimizerParam param;
     param._initBeta=1e2f;
@@ -133,12 +133,13 @@ int main(int argc,char** argv) {
     param._type=OptimizerParam::DIRECT_NEWTON;
     solver.getFix()=move(fix,time*speed,dirs[dirId]);
     solver.solve(param);
-    {
+    if((outputIter%50)==0){
       for(int i=0; i<(int)m.vss().size(); i++)
         m.vssNonConst()[i]=solver.x().template segment<3>(i*3).template cast<MeshExact::T>();
-      VTKWriter<double> os("MassSpring3DSkirt","MassSpring3DSkirt/frame"+std::to_string(outputIter)+".vtk",true);
-      writeObj("MassSpring3DSkirt/frame"+std::to_string(outputIter)+".obj",m);
+      VTKWriter<double> os("MassSpring3DSkirt","MassSpring3DSkirt/frame"+std::to_string(frame)+".vtk",true);
+      writeObj("MassSpring3DSkirt/frame"+std::to_string(frame)+".obj",m);
       m.writeVTK(os,MeshExact::Mat3X4T::Identity());
+      frame++;
     }
     if(solver.dt()==0)
       sim=false;
