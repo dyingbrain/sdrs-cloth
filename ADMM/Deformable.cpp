@@ -220,6 +220,10 @@ void Deformable<N>::setMargin(T margin) {
   _margin=margin;
 }
 template <int N>
+void Deformable<N>::setDamping(T damping) {
+  _damping=damping;
+}
+template <int N>
 void Deformable<N>::setCollCoef(T collCoef) {
   _collCoef=collCoef;
 }
@@ -272,6 +276,8 @@ void Deformable<N>::solve(const OptimizerParam& param) {
     if(_r>0)
       g+=_mass*(-_xL-_xT*_dt)/(_dt*_dt);
     else g+=_mass*(_xLL-_xL*2)/(_dt*_dt);
+    if(_damping>0)
+      g+=_xL*_damping/_dt;
   } else if(_UAVTraj.numCP()>0) {
     //UAV planning
   } else if(_r>0)
@@ -355,10 +361,12 @@ void Deformable<N>::assemble() {
   fix(&HTrips,NULL);
   H.resize(_x0.size(),_x0.size());
   H.setFromTriplets(HTrips.begin(),HTrips.end());
-  if(_dt>0)
+  if(_dt>0) {
     //simulation
     H+=_mass/(_dt*_dt);
-  else if(_UAVTraj.numCP()>0)
+    if(_damping>0)
+      H+=_mass*_damping/_dt;
+  } else if(_UAVTraj.numCP()>0)
     //UAV planning
     H+=_UAVTraj.getSmoothH();
   else if(_r>0)

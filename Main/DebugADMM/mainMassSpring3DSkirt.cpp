@@ -3,6 +3,7 @@
 #include <Environment/EnvironmentVisualizer.h>
 #include <Utils/VTKWriter.h>
 #include <Utils/Utils.h>
+#include <regex>
 
 #include <TinyVisualizer/Drawer.h>
 #include <TinyVisualizer/Camera3D.h>
@@ -56,10 +57,53 @@ void writeObj(const std::filesystem::path& path,const MeshExact& m) {
   for(auto i:m.iss())
     os << "f " << i[0]+1 << " " << i[1]+1 << " " << i[2]+1 << std::endl;
 }
+int extractCheckpoint(const std::string& filename) {
+  if(!endsWith(filename,".ckpt"))
+    return -1;
+  std::regex number_pattern("\\d+"); // Matches one or more digits
+  std::string numbers_extracted;
+  std::sregex_iterator it(filename.begin(), filename.end(), number_pattern);
+  std::sregex_iterator end;
+  while(it!=end) {
+    numbers_extracted+=it->str();
+    it++;
+  }
+  return std::atoi(numbers_extracted.c_str());
+}
+void loadCheckpoint(Deformable<3>& solver,int& dirId,int& outputIter,int& lastSwitchIter,int& frame,std::string datasetName) {
+  int latestCkpt=-1;
+  for(auto file:files(datasetName)) {
+    int ckpt=extractCheckpoint(file.string());
+    if(ckpt>=latestCkpt)
+      latestCkpt=ckpt;
+  }
+  if(latestCkpt<0)
+    return;
+  std::cout << "Continuing from " << "frame"+std::to_string(latestCkpt)+".ckpt" << std::endl;
+  std::ifstream is(datasetName+"/frame"+std::to_string(latestCkpt)+".ckpt",std::ios::binary);
+  readBinaryData(dirId,is);
+  readBinaryData(outputIter,is);
+  readBinaryData(lastSwitchIter,is);
+  readBinaryData(frame,is);
+  readBinaryData(solver.x(),is);
+  readBinaryData(solver.xL(),is);
+  readBinaryData(solver.xLL(),is);
+}
+void saveCheckpoint(const Deformable<3>& solver,int dirId,int outputIter,int lastSwitchIter,int frame,std::string datasetName) {
+  std::ofstream os(datasetName+"/frame"+std::to_string(frame)+".ckpt",std::ios::binary);
+  writeBinaryData(dirId,os);
+  writeBinaryData(outputIter,os);
+  writeBinaryData(lastSwitchIter,os);
+  writeBinaryData(frame,os);
+  writeBinaryData(solver.x(),os);
+  writeBinaryData(solver.xL(),os);
+  writeBinaryData(solver.xLL(),os);
+}
 int main(int argc,char** argv) {
   //build mesh grid
   MeshExact m;
   int N1=64,N2=32;
+  double speed=1;
   createSkirt(N1,N2,1,10,m);
   //solver
   bool sim=false;
@@ -69,6 +113,7 @@ int main(int argc,char** argv) {
   solver.setCL(0.2);
   solver.setCH(1.5);
   solver.setMargin(0.005);
+  solver.setDamping(0.01);
   solver.setG(Vec3T(0,0,-10));
   solver.setMassSpring(m);
   solver.setDt(0.001);
@@ -78,8 +123,25 @@ int main(int argc,char** argv) {
 
   //fix
   std::unordered_map<int,std::pair<T,Deformable<3>::VecNT>> fix=solver.getFix();
+  
+  //param
+  OptimizerParam param;
+  param._initBeta=1e2f;
+  param._tolG=1e-2f;
+  param._maxIter=1e4;
+  param._printI=1;
+  param._type=OptimizerParam::DIRECT_NEWTON;
+  
+  //moving directions
+  std::vector<typename Deformable<3>::VecNT> dirs;
+  dirs.push_back(Deformable<3>::VecNT({1,0,0}).normalized());
+  dirs.push_back(Deformable<3>::VecNT({0,1,0}).normalized());
+  dirs.push_back(Deformable<3>::VecNT({0,0,1}).normalized());
+  dirs.push_back(Deformable<3>::VecNT({1,0,1}).normalized());
+  dirs.push_back(Deformable<3>::VecNT({0,1,1}).normalized());
+  dirs.push_back(Deformable<3>::VecNT({1,1,0}).normalized());
 
-  //draw
+  //visualization
   {
     Drawer drawer(argc,argv);
     std::shared_ptr<CaptureGIFPlugin> ss(new CaptureGIFPlugin(GLFW_KEY_4,"screenshot.gif",drawer.FPS(),true));
@@ -105,49 +167,33 @@ int main(int argc,char** argv) {
     drawer.mainLoop();
   }
 
-
   //Avoid override
-  if(exists("MassSpring3DSkirt")) {
-    std::cout << "Path already exists." << std::endl;
-    return 0;
-  }
-  //Run the simulation
-  std::vector<typename Deformable<3>::VecNT> dirs;
-  dirs.push_back(Deformable<3>::VecNT({1,0,0}).normalized());
-  dirs.push_back(Deformable<3>::VecNT({0,1,0}).normalized());
-  dirs.push_back(Deformable<3>::VecNT({0,0,1}).normalized());
-  dirs.push_back(Deformable<3>::VecNT({1,0,1}).normalized());
-  dirs.push_back(Deformable<3>::VecNT({0,1,1}).normalized());
-  dirs.push_back(Deformable<3>::VecNT({1,1,0}).normalized());
-  recreate("MassSpring3DSkirt");
-  int dirId=0;
-  double time=0;
-  int outputIter=0,frame=0;
-  double lastSwitchTime=0,speed=1;
-  while(outputIter<100000) {
-    OptimizerParam param;
-    param._initBeta=1e2f;
-    param._tolG=1e-2f;
-    param._maxIter=1e4;
-    param._printI=1;
-    param._type=OptimizerParam::DIRECT_NEWTON;
-    solver.getFix()=move(fix,time*speed,dirs[dirId]);
+  std::string datasetName="MassSpring3DSkirt";
+  recreate(datasetName);
+  int dirId=0,outputIter=0,lastSwitchIter=0,frame=0;
+  loadCheckpoint(solver,dirId,outputIter,lastSwitchIter,frame,datasetName);
+  while(true) {
+    solver.getFix()=move(fix,outputIter*solver.dt()*speed,dirs[dirId%(int)dirs.size()]);
     solver.solve(param);
-    if((outputIter%50)==0){
+    //output
+    if((outputIter%50)==0) {
+      saveCheckpoint(solver,dirId,outputIter,lastSwitchIter,frame,datasetName);
       for(int i=0; i<(int)m.vss().size(); i++)
         m.vssNonConst()[i]=solver.x().template segment<3>(i*3).template cast<MeshExact::T>();
-      VTKWriter<double> os("MassSpring3DSkirt","MassSpring3DSkirt/frame"+std::to_string(frame)+".vtk",true);
-      writeObj("MassSpring3DSkirt/frame"+std::to_string(frame)+".obj",m);
+      VTKWriter<double> os(datasetName,datasetName+"/frame"+std::to_string(frame)+".vtk",true);
+      writeObj(datasetName+"/frame"+std::to_string(frame)+".obj",m);
       m.writeVTK(os,MeshExact::Mat3X4T::Identity());
       frame++;
     }
+    //update
     if(solver.dt()==0)
       sim=false;
-    time+=solver.dt();
     outputIter++;
-    if((time-lastSwitchTime)*speed>M_PI*2) {
-      lastSwitchTime=time;
-      dirId=(dirId+1)%dirs.size();
+    if((outputIter-lastSwitchIter)*solver.dt()*speed>M_PI*2) {
+      lastSwitchIter=outputIter;
+      dirId++;
+      if(dirId>=(int)dirs.size()*2)
+        break;
     }
   }
   return 0;

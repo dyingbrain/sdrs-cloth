@@ -33,6 +33,7 @@ class Deformable {
   typedef std::unordered_map<Eigen::Matrix<int,2,1>,T,EdgeHash> L1Constraint;
   typedef typename Optimizer<N>::LinearConstraint LinearConstraint;
  public:
+  //getter
   const auto& getObs() const {
     return _obs;
   }
@@ -54,12 +55,35 @@ class Deformable {
   const auto& x() const {
     return _x;
   }
+  const auto& xL() const {
+    return _xL;
+  }
+  const auto& xLL() const {
+    return _xLL;
+  }
   const auto& getTrajSubd() const {
     return _trajSubd;
   }
   const auto& getUAVTraj() const {
     return _UAVTraj;
   }
+  const auto& getFix() const {
+    return _cons._fixes;
+  }
+  //setter
+  auto& x() {
+    return _x;
+  }
+  auto& xL() {
+    return _xL;
+  }
+  auto& xLL() {
+    return _xLL;
+  }
+  auto& getFix() {
+    return _cons._fixes;
+  }
+  //initializer
   void setAgents(const Vec& x,const Vec& xT,T r);
   void setARAP3D(const MeshExact& mesh,double feature_angle=91,double size=1);      //we generate tet mesh and replace the given mesh with surface of tet mesh
   void setARAP2D(const MeshExact& mesh);
@@ -68,7 +92,6 @@ class Deformable {
   void setObstacle(const MeshExact& mesh);
   void fix(int vid,T k,const VecNT* xStar=NULL);
   void fix(std::function<bool(const VecNT& a)> f,T k);
-  auto& getFix() {return _cons._fixes;}
   int findClosestVid(const VecNT& pos) const;
   void addL1(int id,const VecNT& pos,T k);
   void addL1(std::array<int,2> id,T k);
@@ -82,6 +105,7 @@ class Deformable {
   void setCL(T cL);
   void setCH(T cH);
   void setMargin(T margin);
+  void setDamping(T damping);
   void setCollCoef(T collCoef);
   void setG(const VecNT& g);
   void setUAVTrajResolution(int RES);
@@ -101,7 +125,7 @@ class Deformable {
   Vec _x,_xL,_xLL,_x0,_xT;
   VecNT _g=VecNT::Zero();
   Spring _springMaterial;
-  T _dt=1e-2f,_r=0,_m=1,_margin=.2f,_collCoef=.1f;
+  T _dt=1e-2f,_r=0,_m=1,_margin=.2f,_damping=0.f,_collCoef=.1f;
   //topology
   Springs _ess;                                 //mass springs
   std::vector<ARAPElement> _tss;                //ARAP elements
