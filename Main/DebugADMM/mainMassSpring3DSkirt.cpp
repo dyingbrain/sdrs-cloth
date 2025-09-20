@@ -60,15 +60,11 @@ void writeObj(const std::filesystem::path& path,const MeshExact& m) {
 int extractCheckpoint(const std::string& filename) {
   if(!endsWith(filename,".ckpt"))
     return -1;
-  std::regex number_pattern("\\d+"); // Matches one or more digits
-  std::string numbers_extracted;
-  std::sregex_iterator it(filename.begin(), filename.end(), number_pattern);
-  std::sregex_iterator end;
-  while(it!=end) {
-    numbers_extracted+=it->str();
-    it++;
-  }
-  return std::atoi(numbers_extracted.c_str());
+  std::regex pattern("frame(\\d+)"); // Matches one or more digits
+  std::smatch matches;
+  if(std::regex_search(filename,matches,pattern))
+    return std::stoi(matches[1].str());
+  else return -1;
 }
 void loadCheckpoint(Deformable<3>& solver,int& dirId,int& outputIter,int& lastSwitchIter,int& frame,std::string datasetName) {
   int latestCkpt=-1;
