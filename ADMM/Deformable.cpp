@@ -277,7 +277,7 @@ void Deformable<N>::solve(const OptimizerParam& param) {
       g+=_mass*(-_xL-_xT*_dt)/(_dt*_dt);
     else g+=_mass*(_xLL-_xL*2)/(_dt*_dt);
     if(_damping>0)
-      g+=_xL*_damping/_dt;
+      g-=_xL*_damping/_dt;
   } else if(_UAVTraj.numCP()>0) {
     //UAV planning
   } else if(_r>0)
