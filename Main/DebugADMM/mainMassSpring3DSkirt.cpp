@@ -169,7 +169,8 @@ int main(int argc,char** argv) {
 
   //Avoid override
   std::string datasetName="MassSpring3DSkirt";
-  recreate(datasetName);
+  if(!exists(datasetName))
+    create(datasetName);
   int dirId=0,outputIter=0,lastSwitchIter=0,frame=0;
   loadCheckpoint(solver,dirId,outputIter,lastSwitchIter,frame,datasetName);
   while(true) {
