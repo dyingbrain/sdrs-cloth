@@ -17,7 +17,8 @@ int main(int argc,char** argv) {
   solver.setDamping(0.01);
   solver.setG(Vec3T(0,0,-10));
   solver.setMassSpring(m);
-  solver.setDt(0.001);
+  solver.setCollCoef(0);
+  solver.setDt(0.01);
   solver.fix([](const Deformable<3>::VecNT& v){
     return v.norm()<=1.1;
   },1e4);
@@ -33,10 +34,6 @@ int main(int argc,char** argv) {
   param._printI=1;
   param._type=OptimizerParam::DIRECT_NEWTON;
   
-  //moving directions
-  std::vector<typename Deformable<3>::VecNT> dirs;
-  dirs.push_back(Deformable<3>::VecNT({1,0,0}).normalized());
-
   //visualization
   {
     Drawer drawer(argc,argv);
@@ -64,16 +61,17 @@ int main(int argc,char** argv) {
   }
 
   //Avoid override
-  std::string datasetName="MassSpring3DSkirt";
+  std::string datasetName="MassSpring3DSkirtNoCollision";
   if(!exists(datasetName))
     create(datasetName);
   int dirId=0,outputIter=0,lastSwitchIter=0,frame=0;
   loadCheckpoint(solver,dirId,outputIter,lastSwitchIter,frame,datasetName);
+  Deformable<3>::VecNT dir({1,0,0});
   while(true) {
-    solver.getFix()=move(fix,outputIter*solver.dt()*speed,dirs[dirId%(int)dirs.size()]);
+    solver.getFix()=move(fix,outputIter*solver.dt()*speed,dir);
     solver.solve(param);
     //output
-    if((outputIter%10)==0) {
+    if((outputIter%1)==0) {
       saveCheckpoint(solver,dirId,outputIter,lastSwitchIter,frame,datasetName);
       for(int i=0; i<(int)m.vss().size(); i++)
         m.vssNonConst()[i]=solver.x().template segment<3>(i*3).template cast<MeshExact::T>();

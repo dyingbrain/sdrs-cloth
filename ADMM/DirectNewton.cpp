@@ -93,7 +93,8 @@ void DirectNewton<N>::optimize(const OptimizerParam& param) {
   }
   //collision remove by energy value
   auto xCurrCollFree=x.segment(0,Optimizer<N>::_x.size());
-  Optimizer<N>::_coll->removeByEnergy(xCurrCollFree,*this,Epsilon<T>::finiteDifferenceEps());
+  if(Optimizer<N>::_coll)
+    Optimizer<N>::_coll->removeByEnergy(xCurrCollFree,*this,Epsilon<T>::finiteDifferenceEps());
   //timing
   TENDV();
 }
