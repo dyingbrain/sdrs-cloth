@@ -186,8 +186,8 @@ void runDataset(int argc,char** argv,bool hasColl,const std::vector<typename Def
     if((outputIter-lastSwitchIter)*solver.dt()*speed>M_PI*2) {
       lastSwitchIter=outputIter;
       dirId++;
-      if(dirId>=(int)dirs.size()*2)
-        break;
+      //if(dirId>=(int)dirs.size()*2)
+      //  break;
     }
   }
 }
