@@ -159,7 +159,9 @@ void runDataset(int argc,char** argv,bool hasColl,const std::vector<typename Def
   }
 
   //Avoid override
-  std::string datasetName="MassSpring3DSkirtNoCollision";
+  std::string datasetName="MassSpring3DSkirt";
+  if(!hasColl)
+    datasetName+="NoCollision";
   if(!exists(datasetName))
     create(datasetName);
   int dirId=0,outputIter=0,lastSwitchIter=0,frame=0;
